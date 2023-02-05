@@ -9,8 +9,8 @@ from utilities.account_data_fetcher_base import accountFetcherBase
 class ethereumDataFetcher(accountFetcherBase):
     __URL = "https://api.etherscan.io/api"
     __EXCHANGE = "Etherscan"
-    __COIN_BY_ADDRESSES = {"USDC":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7"}
-    __DECIMAL_BY_COIN = {"USDC": 6, "USDT": 6}
+    __COIN_BY_ADDRESSES = {"USDC":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7", "AMPL":"0xD46bA6D942050d489DBd938a2C909A5d5039A161", "DAI": "0x6B175474E89094C44Da98b954EedeAC495271d0F", "DYDX": "0x92D6C1e31e14520e676a687F0a93788B716BEff5"}
+    __DECIMAL_BY_COIN = {"USDC": 6, "USDT": 6, "AMPL": 9, "DAI": 18, "DYDX": 18}
 
     def __init__(self, path: str, password: str) -> None:
         super().__init__(path, password)
@@ -163,6 +163,7 @@ class ethereumDataFetcher(accountFetcherBase):
 
     def get_netliq(self, get_price_from_bybit: Callable) -> float:
         balance_by_coin: dict = self.get_total_balance_by_coin()
+        self.logger.debug(f"{balance_by_coin=}")
         netliq: float = 0
         for coin, balance in balance_by_coin.items():
             if "USD" in coin:
@@ -206,7 +207,7 @@ if __name__ == '__main__':
     logger: logging.Logger = logging.getLogger()
     pwd = getpass("provide password for pk:")
     current_path = os.path.realpath(os.path.dirname(__file__))
-    executor = ethereumDataFetcher(current_path, pwd, logger)
-    balances = executor.get_sum_of_balance()
+    executor = ethereumDataFetcher(current_path, pwd)
+    balances = executor.get_netliq()
     print(balances)
 
