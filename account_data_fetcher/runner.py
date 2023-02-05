@@ -123,10 +123,14 @@ class Runner:
                 return today != today_df
 
         def is_ib_flew_new_day(self, for_which_file: str = "/netliq.csv") -> bool:
+            if not self.account_data_fetcher.ib_executor:
+                return True #IB not used
             if for_which_file == "/netliq.csv":
                 when_generated: datetime = self.account_data_fetcher.ib_executor.update_balance_and_get_ib_datetime()
-            if for_which_file == "/positions.csv":
+            elif for_which_file == "/positions.csv":
                 when_generated: datetime = self.account_data_fetcher.ib_executor.update_positions_and_get_ib_datetime()
+            else:
+                raise NotImplemented(f"file unkown {for_which_file}")
             return self.is_new_day(for_which_file, when_generated)
 
         def create_task(self, function: Callable, *args) -> asyncio.Task:
