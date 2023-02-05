@@ -5,7 +5,7 @@ class requestHandler:
     def ___init__(self) -> None:
         self.logger = logging.getLogger(__name__)
 
-    def api_module(self, url_base: str, url_extension: str) -> str:
+    def api_module(self, url_base: str, url_extension: str = "") -> str:
         """Creates an API URL.
         Overview:
         ----  
