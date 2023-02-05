@@ -5,7 +5,7 @@ from typing import List, Optional
 
 import pandas as pd
 
-from thesis_monitoring.hkd_peg_breaking.request_handler import requestHandler
+from utilities.request_handler import requestHandler
 
 class dataFetcher:
     def __init__(self) -> None:
