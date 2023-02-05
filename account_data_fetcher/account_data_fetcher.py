@@ -14,6 +14,7 @@ from account_data_fetcher.dydx_data_fetcher import dydxDataFetcher
 from account_data_fetcher.trades_station_data_fetcher import tradesStationDataFetcher
 from account_data_fetcher.bybit_data_fetcher import bybitDataFetcher
 from account_data_fetcher.ethereum_data_fetcher import ethereumDataFetcher
+from account_data_fetcher.coingecko_data_fetcher import coingeckoDataFetcher
 
 class AccountDataFetcher:
     def __init__(self, pwd: str, ib_fetching_method: str, exchange_list: List[str]) -> None:
@@ -51,7 +52,7 @@ class AccountDataFetcher:
         if "BYBIT" in exchange_list:
             self.bybit_executor = bybitDataFetcher(self.path, pwd)
         else:
-            self.dydx_executor = None
+            self.bybit_executor = None
 
         if "Etherscan" in exchange_list:
             self.ethereum_executor = ethereumDataFetcher(self.path, pwd)
@@ -60,6 +61,8 @@ class AccountDataFetcher:
 
         if "FTX" in exchange_list:
             raise FileNotFoundError("You got Rekt")
+        
+        self.price_fetcher = coingeckoDataFetcher().get_prices
 
     def write_balance_to_csv(self, manual_balance: float) -> None:
         balance_dict: dict = self.get_global_balance()
@@ -156,7 +159,7 @@ class AccountDataFetcher:
             bybit_balance = 0.0
 
         if self.ethereum_executor:
-            ethereum_balance = self.ethereum_executor.get_netliq()
+            ethereum_balance = self.ethereum_executor.get_netliq(self.price_fetcher)
         else:
             ethereum_balance = 0.0        
 
@@ -201,9 +204,10 @@ class AccountDataFetcher:
             bybit_derivative_positions = self.bybit_executor.get_positions("FUTURE")
         else:
             bybit_spot_positions = self.generate_empty_global_positions_dict()
+            bybit_derivative_positions = self.generate_empty_global_positions_dict()
 
         if self.ethereum_executor:
-            ethereum_position = self.ethereum_executor.get_position(self.bybit_executor._spot_client.last_traded_price)
+            ethereum_position = self.ethereum_executor.get_position(self.price_fetcher)
         else:
             ethereum_position = self.generate_empty_global_positions_dict()
 
