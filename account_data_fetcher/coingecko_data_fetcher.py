@@ -29,8 +29,6 @@ class coingeckoDataFetcher:
             args=params
         )
 
-        print(result)
-
         price_per_symbol: Dict[str, Dict[str, float]] = {}
 
         for coin, price_dict in result.items():
