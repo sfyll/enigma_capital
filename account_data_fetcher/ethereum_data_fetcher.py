@@ -17,7 +17,7 @@ class balanceMetaData:
 
             dt = datetime.utcnow()
 
-            delta: timedelta = self.timestamp - dt
+            delta: timedelta = dt - self.timestamp
 
             return delta.total_seconds() < delta_in_seconds_allowed
 
@@ -31,7 +31,7 @@ class priceMetaData:
 
             dt = datetime.utcnow()
 
-            delta: timedelta = self.timestamp - dt
+            delta: timedelta = dt - self.timestamp 
                 
             return delta.total_seconds() < delta_in_seconds_allowed
 
