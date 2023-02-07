@@ -84,10 +84,10 @@ class ibDataFetcher(accountFetcherBase):
         dt = datetime.utcnow()
 
         if query_type == "BALANCE":
-            delta: timedelta = object_to_check.whenGenerated - dt + timedelta(hours=self.__HOURS_DIFFERENCE_FROM_UTC)
+            delta: timedelta = (dt + timedelta(hours=self.__HOURS_DIFFERENCE_FROM_UTC)) - object_to_check.whenGenerated 
             return delta.total_seconds() < 120
         if query_type == "POSITIONS":
-            delta: timedelta = object_to_check.whenGenerated - dt + timedelta(hours=self.__HOURS_DIFFERENCE_FROM_UTC)
+            delta: timedelta = (dt + timedelta(hours=self.__HOURS_DIFFERENCE_FROM_UTC)) - object_to_check.whenGenerated 
             return delta.total_seconds() < 120
     
     def get_and_parse_data(self, token, query_id):
