@@ -87,7 +87,7 @@ class dydxDataFetcher(accountFetcherBase):
                 counter +=1
                 try:
                     return self.client.private.get_accounts().data
-                except ConnectionResetError as e:
+                except ConnectionError as e:
                     self.logger.debug(e)
                     sleep(5)
                     return self.client.private.get_accounts().data
@@ -133,7 +133,7 @@ class dydxDataFetcher(accountFetcherBase):
                 counter +=1
                 try:
                     return self.client.public.get_markets().data
-                except ConnectionResetError as e:
+                except ConnectionError as e:
                     self.logger.debug(e)
                     sleep(5)
             else:
