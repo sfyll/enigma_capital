@@ -32,7 +32,7 @@ class bybitDataFetcher(accountFetcherBase):
 
         for balance in balances:
 
-            coin_balance = float(balance["total"]) + float(balance["free"]) + float(balance["locked"])
+            coin_balance = float(balance["total"])
             name = balance["coin"]
             
             if name.upper() in ["BUSD", "USDC", "USDT"]:
@@ -83,7 +83,7 @@ class bybitDataFetcher(accountFetcherBase):
         positions = self._spot_client.my_position("/spot/v1/account")["result"]["balances"]
 
         for position in positions:
-            quantity = round(float(position["total"]) + float(position["free"]) + float(position["locked"]),3)
+            quantity = round(float(position["total"]),3)
             dollar_quantity = quantity if position["coin"].upper() in ["BUSD", "USDC", "USDT"] else \
                               quantity * self.__get_coin_price(position["coin"])
             if dollar_quantity > 100:
@@ -142,4 +142,4 @@ if __name__ == "__main__":
     from getpass import getpass
     pwd = getpass("provide password for pk:")
     executor = bybitDataFetcher(os.path.realpath(os.path.dirname(__file__)), pwd)
-    print(executor.get_positions("SPOT"))
+    print(executor.get_netliq())
