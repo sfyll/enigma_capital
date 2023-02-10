@@ -39,7 +39,7 @@ class bybitDataFetcher(accountFetcherBase):
                 dollar_netliq += coin_balance
             
             else:
-                dollar_netliq += coin_balance * float(self._spot_client.last_traded_price(symbol=name+"USDC")["price"])
+                dollar_netliq += coin_balance * self.__get_coin_price(name)
 
 
         return dollar_netliq
@@ -60,7 +60,7 @@ class bybitDataFetcher(accountFetcherBase):
                     dollar_netliq += float(data["equity"])
                 
                 else:
-                    dollar_netliq += float(data["equity"]) * float(self._derivative_client.last_traded_price(symbol=coin_name+"USDT")["price"])
+                    dollar_netliq += float(data["equity"]) * self.__get_coin_price(coin_name)
     
         return dollar_netliq
 
@@ -83,12 +83,14 @@ class bybitDataFetcher(accountFetcherBase):
         positions = self._spot_client.my_position("/spot/v1/account")["result"]["balances"]
 
         for position in positions:
-            data_to_return["Symbol"].append(position["coin"])
-            data_to_return["Multiplier"].append(1)
-            data_to_return["Quantity"].append(round(float(position["total"]) + float(position["free"]) + float(position["locked"]),3))
-            dollar_quantity = data_to_return["Quantity"][-1] if position["coin"].upper() in ["BUSD", "USDC", "USDT"] else \
-                              data_to_return["Quantity"][-1] * float(self._spot_client.last_traded_price(symbol=data_to_return["Symbol"]+"USDC")["price"])
-            data_to_return["Dollar Quantity"].append(dollar_quantity)
+            quantity = round(float(position["total"]) + float(position["free"]) + float(position["locked"]),3)
+            dollar_quantity = quantity if position["coin"].upper() in ["BUSD", "USDC", "USDT"] else \
+                              quantity * self.__get_coin_price(position["coin"])
+            if dollar_quantity > 100:
+                data_to_return["Symbol"].append(position["coin"])
+                data_to_return["Multiplier"].append(1)
+                data_to_return["Quantity"].append(quantity)
+                data_to_return["Dollar Quantity"].append(dollar_quantity)
 
         return data_to_return
 
@@ -105,7 +107,6 @@ class bybitDataFetcher(accountFetcherBase):
         for position_data in positions:
             position: dict = position_data["data"]
             if position["size"]:
-
                 data_to_return["Symbol"].append(position["symbol"])
                 data_to_return["Multiplier"].append(1)
                 data_to_return["Quantity"].append(round(position["size"],3))
@@ -118,11 +119,27 @@ class bybitDataFetcher(accountFetcherBase):
         future_contract_positions = self._derivative_client.my_position('/futures/private/position/list')["result"]
         inverse_contract_positions = self._derivative_client.my_position('/v2/private/position/list')["result"]
         return linear_contract_positions + future_contract_positions + inverse_contract_positions
-    
+
+    def __get_coin_price(self, symbol: str) -> float:
+        try:
+            return float(self._spot_client.last_traded_price(symbol=symbol+"USD")["result"]["price"])
+        except pybit.exceptions.InvalidRequestError:
+            pass
+
+        try:
+            return float(self._spot_client.last_traded_price(symbol=symbol+"USDC")["result"]["price"])
+        except pybit.exceptions.InvalidRequestError:
+            pass
+
+        try:
+            return float(self._spot_client.last_traded_price(symbol=symbol+"USDT")["result"]["price"])
+        except pybit.exceptions.InvalidRequestError:
+            pass
+
     
 
 if __name__ == "__main__":
     from getpass import getpass
     pwd = getpass("provide password for pk:")
     executor = bybitDataFetcher(os.path.realpath(os.path.dirname(__file__)), pwd)
-    print(executor.get_positions("FUTURE"))
+    print(executor.get_positions("SPOT"))
