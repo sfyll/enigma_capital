@@ -1,10 +1,18 @@
+import datetime as dt
+import hashlib
+import hmac
 import logging
 import os
+import time
+from typing import List, Optional
 
 import pybit
 from pybit.exceptions import InvalidRequestError
 
+from account_data_fetcher.bybit_api.bybit_connector import bybitApiConnector
+
 from utilities.account_data_fetcher_base import accountFetcherBase
+from utilities.request_handler import requestHandler
 
 
 class bybitDataFetcher(accountFetcherBase):
@@ -14,55 +22,37 @@ class bybitDataFetcher(accountFetcherBase):
         super().__init__(path, password)
         self.logger = logging.getLogger(__name__) 
         self._subaccount_name = sub_account_name
-        self._spot_client = pybit.HTTP(self._ENDPOINT, api_key=self.api_meta_data[self._EXCHANGE].key, api_secret=self.api_meta_data[self._EXCHANGE].secret, spot=True)
-        self._derivative_client = pybit.HTTP(self._ENDPOINT, api_key=self.api_meta_data[self._EXCHANGE].key, api_secret=self.api_meta_data[self._EXCHANGE].secret, spot=False)
+        self.bybit_connector = bybitApiConnector(api_key=self.api_meta_data[self._EXCHANGE].key, api_secret=self.api_meta_data[self._EXCHANGE].secret)
 
     def get_netliq(self) -> float:
-        spot_netliq = self.__get_spot_balance()
-        derivatives_netliq = self.__get_derivatives_balance()
-        return round(spot_netliq + derivatives_netliq, 2)
+        netliq = self.__get_balances()
+        return round(netliq, 2)
     
-    def __get_spot_balance(self) -> float:
-        dollar_netliq: float = 0
-
+    def __get_balances(self) -> float:
         try:
-            balances = self._spot_client.get_wallet_balance()["result"]["balances"]
+            derivative_balance = float(self.bybit_connector.get_derivative_balance()[0]["totalEquity"])
         except InvalidRequestError as e:
             raise e
 
-        for balance in balances:
+        spot_balances: List[dict] = self.bybit_connector.get_all_coin_balance(accountType="SPOT")
 
-            coin_balance = float(balance["total"])
+        spot_netliq: float = 0
+
+        for balance in spot_balances:
+            
+            coin_balance = float(balance["walletBalance"])
+
+            if not coin_balance:
+                continue
+                
             name = balance["coin"]
             
             if name.upper() in ["BUSD", "USDC", "USDT"]:
-                dollar_netliq += coin_balance
-            
+                spot_netliq += coin_balance
             else:
-                dollar_netliq += coin_balance * self.__get_coin_price(name)
+                spot_netliq += coin_balance * self.__get_coin_price(name)
 
-
-        return dollar_netliq
-
-    def __get_derivatives_balance(self) -> float:
-        dollar_netliq: float = 0
-
-        try:
-            derivatives_netliq = self._derivative_client.get_wallet_balance()["result"]
-        except InvalidRequestError as e:
-            raise e
-
-        for coin_name, data in derivatives_netliq.items():
-            
-            if data['equity']:
-
-                if coin_name.upper() in ["BUSD", "USDC", "USDT"]:
-                    dollar_netliq += float(data["equity"])
-                
-                else:
-                    dollar_netliq += float(data["equity"]) * self.__get_coin_price(coin_name)
-    
-        return dollar_netliq
+        return round(spot_netliq + derivative_balance)
 
     def get_positions(self, market: str) -> dict:
         if market == "SPOT":
@@ -80,10 +70,10 @@ class bybitDataFetcher(accountFetcherBase):
             "Dollar Quantity": []
         }
         
-        positions = self._spot_client.my_position("/spot/v1/account")["result"]["balances"]
+        positions: List[dict] = self.bybit_connector.get_all_coin_balance(accountType="SPOT")
 
         for position in positions:
-            quantity = round(float(position["total"]),3)
+            quantity = round(float(position["walletBalance"]),3)
             dollar_quantity = quantity if position["coin"].upper() in ["BUSD", "USDC", "USDT"] else \
                               quantity * self.__get_coin_price(position["coin"])
             if dollar_quantity > 100:
@@ -104,42 +94,47 @@ class bybitDataFetcher(accountFetcherBase):
         
         positions = self.__get_aggregated_derivatives_positions()
         
-        for position_data in positions:
-            position: dict = position_data["data"]
+        for position in positions["list"]:
             if position["size"]:
                 data_to_return["Symbol"].append(position["symbol"])
                 data_to_return["Multiplier"].append(1)
-                data_to_return["Quantity"].append(round(position["size"],3))
-                data_to_return["Dollar Quantity"].append(float(position["position_value"]) + float(position["cum_realised_pnl"] + float(position["unrealised_pnl"])))
+                data_to_return["Quantity"].append(round(float(position["size"]),3))
+                data_to_return["Dollar Quantity"].append(round(float(position["positionValue"]) + float(position["cumRealisedPnl"]) + float(position["unrealisedPnl"]),3))
 
         return data_to_return
 
-    def __get_aggregated_derivatives_positions(self) -> list:
-        linear_contract_positions = self._derivative_client.my_position('/private/linear/position/list')["result"]
-        future_contract_positions = self._derivative_client.my_position('/futures/private/position/list')["result"]
-        inverse_contract_positions = self._derivative_client.my_position('/v2/private/position/list')["result"]
-        return linear_contract_positions + future_contract_positions + inverse_contract_positions
+    def __get_aggregated_derivatives_positions(self, is_unified_account: bool = True) -> list:
+        if is_unified_account:
+            return self.bybit_connector.get_position(category="linear", settleCoin="USDT")
+        else:
+            linear_contract_positions = self.bybit_connector.get_position(category="linear", settleCoin="USDT")
+            inverse_contract_positions = self.bybit_connector.get_position(category='inverse')
+            return linear_contract_positions + inverse_contract_positions
 
     def __get_coin_price(self, symbol: str) -> float:
+        "starting with most likely, USDT unfort"
         try:
-            return float(self._spot_client.last_traded_price(symbol=symbol+"USD")["result"]["price"])
+            return float(self.bybit_connector.get_last_traded_price(symbol=symbol+"USDT")["price"])
         except pybit.exceptions.InvalidRequestError:
             pass
 
         try:
-            return float(self._spot_client.last_traded_price(symbol=symbol+"USDC")["result"]["price"])
+            return float(self.bybit_connector.get_last_traded_price(symbol=symbol+"USD")["price"])
         except pybit.exceptions.InvalidRequestError:
             pass
 
         try:
-            return float(self._spot_client.last_traded_price(symbol=symbol+"USDT")["result"]["price"])
+            return float(self.bybit_connector.get_last_traded_price(symbol=symbol+"USDC")["price"])
         except pybit.exceptions.InvalidRequestError:
             pass
-
     
 
 if __name__ == "__main__":
     from getpass import getpass
     pwd = getpass("provide password for pk:")
     executor = bybitDataFetcher(os.path.realpath(os.path.dirname(__file__)), pwd)
-    print(executor.get_netliq())
+    #TODO:do below but with asset split, right now gives only derivatives view.
+    # print(executor.bybit_connector.get_position(category="linear", settleCoin="USDT"))
+    # print(executor.get_positions("SPOT"))
+    print(executor.get_positions("FUTURE"))
+    # print(executor.get_netliq())
