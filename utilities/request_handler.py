@@ -1,9 +1,14 @@
 import logging
+from typing import Optional, Union
+
 import requests
 
 class requestHandler:
     def ___init__(self) -> None:
         self.logger = logging.getLogger(__name__)
+
+    def endpoint_extension(self, url_base: str, url_extension: str = "") -> str:
+        return "/".join([url_base, url_extension])
 
     def api_module(self, url_base: str, url_extension: str = "") -> str:
         """Creates an API URL.
@@ -20,7 +25,8 @@ class requestHandler:
 
         return '?'.join([url_base, url_extension])
 
-    def handle_requests(self, url: str, method: str, args: dict = None) -> dict:
+    def handle_requests(self, url: str, method: str, args: dict = None, headers: Optional[dict] = None, 
+                        raw_response: bool = False) -> Union[requests.Response, dict]:
         """[summary]
         Arguments:
         ----
@@ -38,9 +44,12 @@ class requestHandler:
         """
 
         if method == 'get':
-
-            response = requests.get(
-            url=url, params=args, verify=True)
+            if headers:
+                response = requests.get(
+                url=url, params=args, verify=True, headers=headers)
+            else:
+                response = requests.get(
+                url=url, params=args, verify=True)
 
         elif method == 'post':
 
@@ -61,26 +70,19 @@ class requestHandler:
             raise ValueError(
                 'The type of request you are making is incorrect.')
 
-        # grab the status code
-        status_code = response.status_code
-
-        # grab the response. headers.
-        response_headers = response.headers
-
-        if status_code == 200:
-
-            if response_headers['Content-Type'] in ['application/json', 'charset=utf-8', "application/json; charset=utf-8"]:
-                return response.json()
-            else:
-                raise Exception("unhandled response type")
-
+        if raw_response:
+            return response
+        
         else:
-            # Error
-            print('')
-            print('-'*80)
-            print("BAD REQUEST - STATUS CODE: {}".format(status_code))
-            print("RESPONSE URL: {}".format(response.url))
-            print("RESPONSE HEADERS: {}".format(response.headers))
-            print("RESPONSE TEXT: {}".format(response.text))
-            print('-'*80)
-            print('')
+            # grab the status code
+            status_code = response.status_code
+
+            # grab the response. headers.
+            response_headers = response.headers
+
+            if status_code == 200:
+
+                if response_headers['Content-Type'] in ['application/json', 'charset=utf-8', "application/json; charset=utf-8"]:
+                    return response.json()
+                else:
+                    raise Exception("unhandled response type")
