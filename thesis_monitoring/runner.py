@@ -9,6 +9,11 @@ from typing import Callable, Optional
 
 from thesis_monitoring.hkd_peg_breaking.data_aggr_and_sender import dataAggrAndSender
 
+try:
+    from thesis_monitoring.uranium.uranium_thesis_monitoring import uraniumThesisMonitoring
+except FileNotFoundError or ModuleNotFoundError:
+    pass #hidden thesis, should it be?
+    
 class Runner:
         def __init__(self, logger: Optional[logging.Logger] = None) -> None:
             self.logger = logging.getLogger(__name__) if not logger else logger
@@ -18,23 +23,34 @@ class Runner:
                 getattr(signal, signame),
                 functools.partial(self.ask_exit, signame, self.loop, self.logger))
             self.data_aggr_and_sender: Optional[dataAggrAndSender] = None
+            self.uranium_aggr_and_sender = None
 
         @staticmethod
         def ask_exit(signame, loop, logger) -> None:
             logger.info("got signal %s: exit" % signame)
             loop.stop()
 
+        async def periodic_uranium_thesis(self, pwd, seconds: int) -> None:
+            self.logger.debug(f"running periodic task with following second delay: {seconds}")
+            if not self.uranium_aggr_and_sender:
+                self.uranium_aggr_and_sender = uraniumThesisMonitoring(pwd)
+                await self.uranium_aggr_and_sender.send_to_telegram_saved_text()
+                await asyncio.sleep(seconds)
+            while True:
+                await self.uranium_aggr_and_sender.send_to_telegram_saved_text()
+                await asyncio.sleep(seconds)
+
         async def periodic_hkd_thesis_plotter(self, pwd, seconds: int, starting_date: str) -> None:
             self.logger.debug(f"running periodic task with following second delay: {seconds}")
             if not self.data_aggr_and_sender:
                 self.data_aggr_and_sender = dataAggrAndSender(pwd, starting_date)
                 if self.is_new_week():
-                    await self.data_aggr_and_sender.aggr_and_send_data()
+                    await self.data_aggr_and_sender.aggr_and_send_data_hkd()
                 else:
                     self.logger.info(f"Data for today already present, waiting for tomorrow")
             while True:
                 if self.is_new_week():
-                    await self.data_aggr_and_sender.aggr_and_send_data()
+                    await self.data_aggr_and_sender.aggr_and_send_data_hkd()
                 await asyncio.sleep(seconds)
 
         def is_new_week(self) -> bool:
@@ -70,7 +86,7 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose",action="count",default=0,
                     help="Be more verbose. Both -v and -q may be used multiple times.")
     parser.add_argument('--log-file', dest="log_file", type=str, nargs='?')
-    parser.add_argument('--request-type', dest="request_type", choices=["HKD"],
+    parser.add_argument('--request-type', dest="request_type",
                     type=str, nargs='?', default="HKD")
     parser.add_argument('--starting-date', dest="starting_date",
                     type=str, nargs='?', default="2022-01-01")
@@ -100,6 +116,8 @@ if __name__ == "__main__":
 
     if args.request_type == "HKD":
         executor.create_task(executor.periodic_hkd_thesis_plotter, pwd, args.seconds, args.starting_date)
+    elif args.request_type == "URANIUM":
+        executor.create_task(executor.periodic_uranium_thesis, pwd, args.seconds)
     else:
         raise NotImplementedError(f"not aware of this request type: {args.request_type}")
 
