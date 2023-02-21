@@ -18,6 +18,12 @@ class telegramHandler(accountFetcherBase):
                 photo=open(file_path, "rb")
             )
 
+    async def send_text_to_telegram(self, text: str) -> None:
+        return await self.bot.send_message(
+                self.channel_id,
+                text=text
+        )
+
 
 if __name__ == '__main__':
     from getpass import getpass
