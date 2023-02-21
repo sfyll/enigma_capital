@@ -11,7 +11,7 @@ from thesis_monitoring.hkd_peg_breaking.data_aggr_and_sender import dataAggrAndS
 
 try:
     from thesis_monitoring.uranium.uranium_thesis_monitoring import uraniumThesisMonitoring
-except FileNotFoundError or ModuleNotFoundError:
+except (FileNotFoundError, ModuleNotFoundError):
     pass #hidden thesis, should it be?
     
 class Runner:
