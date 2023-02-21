@@ -25,7 +25,7 @@ class dataAggrAndSender(telegramHandler):
         self.hibor_libor_df_daily : Optional[pd.DataFrame] = None
         self.beginning_date = beginning_date
 
-    async def aggr_and_send_data(self) -> None:
+    async def aggr_and_send_data_hkd(self) -> None:
         await self.plot_and_send_historical_rates()
         await self.plot_and_send_daily_rates()
         await self.get_and_process_renminbi_facility_data()
