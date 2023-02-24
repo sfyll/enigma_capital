@@ -1,16 +1,11 @@
-import datetime as dt
-import hashlib
-import hmac
 import logging
 import os
-import time
-from typing import List, Optional
+from typing import List
 
 from account_data_fetcher.bybit_api.bybit_connector import bybitApiConnector
 from account_data_fetcher.bybit_api.exception import FailedRequestError, InvalidRequestError
 
 from utilities.account_data_fetcher_base import accountFetcherBase
-from utilities.request_handler import requestHandler
 
 
 class bybitDataFetcher(accountFetcherBase):
