@@ -6,10 +6,8 @@ import os
 import time
 from typing import List, Optional
 
-import pybit
-from pybit.exceptions import InvalidRequestError
-
 from account_data_fetcher.bybit_api.bybit_connector import bybitApiConnector
+from account_data_fetcher.bybit_api.exception import FailedRequestError, InvalidRequestError
 
 from utilities.account_data_fetcher_base import accountFetcherBase
 from utilities.request_handler import requestHandler
@@ -115,17 +113,17 @@ class bybitDataFetcher(accountFetcherBase):
         "starting with most likely, USDT unfort"
         try:
             return float(self.bybit_connector.get_last_traded_price(symbol=symbol+"USDT")["price"])
-        except pybit.exceptions.InvalidRequestError:
+        except InvalidRequestError:
             pass
 
         try:
             return float(self.bybit_connector.get_last_traded_price(symbol=symbol+"USD")["price"])
-        except pybit.exceptions.InvalidRequestError:
+        except InvalidRequestError:
             pass
 
         try:
             return float(self.bybit_connector.get_last_traded_price(symbol=symbol+"USDC")["price"])
-        except pybit.exceptions.InvalidRequestError:
+        except InvalidRequestError:
             pass
     
 
