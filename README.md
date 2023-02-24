@@ -30,7 +30,7 @@ PS: You'll find what I meant by dashboard by being able to run the code in `/the
 1. Clone the repo;
 2. Navigate to the base repo directory and run `virtualenv env`
 3. Activate your virtual environment: `source env/bin/activate`
-4. Install the requirements: `pip -r install requirements.txt`
+4. Install the requirements: `pip install -r requirements.txt`
 5. Download rust for cryptography lib: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 6. Create a private key using `encryptor.py` in `/utilities` (USE A PASSWORD WHEN DOING SO), since the project looks for private keys in each directory, you would for example run `python3 ../utilities/encryptor.py` while setting-up your account-data-fetcher within that directory, and so on for each directory.
 7. Using `encryptor.py`, start writting your first API keys using `write_api_key_enc_to_file` and then add as many as you wish with `add_keys_to_encrypted_file`, the pattern being the following:
