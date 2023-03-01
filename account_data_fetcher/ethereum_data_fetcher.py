@@ -52,6 +52,7 @@ class ethereumDataFetcher(accountFetcherBase):
         self.w3 = Web3(Web3.HTTPProvider(self.__URL+self.api_meta_data[self.__EXCHANGE].key))
         self.contract_by_coin: dict = self.__get_contract_by_coin()
         self.address_of_interest: list = self.__get_address_of_interest(path)
+        self.delta_in_seconds_allowed: int = delta_in_seconds_allowed
 
     def __get_contract_by_coin(self) -> dict:
         contract_by_coin: dict = {}
@@ -93,7 +94,6 @@ class ethereumDataFetcher(accountFetcherBase):
         
         for my_address in self.address_of_interest:
             balance +=  self.w3.eth.get_balance(Web3.toChecksumAddress(my_address)) / (10 ** self.__DECIMAL_BY_COIN["ETH"])
-            print(balance)
 
         return balance
     
