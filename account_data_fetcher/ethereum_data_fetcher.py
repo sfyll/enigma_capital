@@ -37,7 +37,7 @@ class priceMetaData:
                 
             return delta.total_seconds() < delta_in_seconds_allowed
 
-
+#TODO: Batch calls via multicall contracts + use helios lightweight client (need to fix eth_call loops, broken atm)
 class ethereumDataFetcher(accountFetcherBase):
     __URL = "https://eth-mainnet.g.alchemy.com/v2/"
     __EXCHANGE = "Alchemy"
