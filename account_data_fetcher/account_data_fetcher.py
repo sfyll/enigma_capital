@@ -8,7 +8,6 @@ import pandas as pd
 
 from account_data_fetcher.ib_data_fetcher_api import InteractiveBrokersAppAsync
 from account_data_fetcher.ib_data_fetcher_flex_queries import ibDataFetcher
-from account_data_fetcher.ftx_data_fetcher import ftxDataFetcher
 from account_data_fetcher.binance_data_fetcher import binanceDataFetcher
 from account_data_fetcher.dydx_data_fetcher import dydxDataFetcher
 from account_data_fetcher.trades_station_data_fetcher import tradesStationDataFetcher
@@ -164,13 +163,12 @@ class AccountDataFetcher:
             ethereum_balance = 0.0        
 
         balances = {
-            "binance_spot": binance_dollar_balance,
-            "binance_margin": binance_dollar_isolated_margin_balance,
+            "binance": binance_dollar_balance + binance_dollar_isolated_margin_balance,
             "interactive_brokers": ib_balance,
             "tradestation": tradestation_balance,
             "dydx": dydx_balance,
             "bybit": bybit_balance,
-            "ethereum_balance": ethereum_balance,
+            "ethereum": ethereum_balance,
             "netliq": binance_dollar_balance + binance_dollar_isolated_margin_balance + ib_balance + tradestation_balance + dydx_balance + bybit_balance + ethereum_balance 
         }
         
