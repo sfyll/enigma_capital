@@ -9,7 +9,7 @@ from typing import Optional
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class DepositAndWithdraw:
-    date: datetime
+    date: str
     from_exchange: Optional[str]
     to_exchange: Optional[str]
     amount: float
@@ -40,12 +40,18 @@ class depositAndWithdrawHandler:
         
     def __get_data(self) -> DepositAndWithdraw:
         return DepositAndWithdraw(
-            date=datetime.utcnow(),
+            date=self.get_date(),
             from_exchange=self.get_from_exchange(),
             to_exchange=self.get_to_exchange(),
             amount=self.get_user_amount(),
             comment=self.get_comment()
         )
+
+    def get_date(self) -> datetime:
+        date: Optional[str] = input("If the transaction is not from today, specify the date in dd/mm/yyy format, otherwise press enter and it'll get generated automatically \n")
+        if not date:
+            date = datetime.utcnow().strftime('%d/%m/%Y')
+        return date
 
     def get_from_exchange(self) -> Optional[str]:
         from_exchange: Optional[str] = input("Please insert from which exchange you withdrew. If None (money inflow), press enter \n")
