@@ -54,7 +54,7 @@ class AccountDataFetcher:
         else:
             self.bybit_executor = None
 
-        if "Etherscan" in exchange_list:
+        if "Ethereum" in exchange_list:
             self.ethereum_executor = ethereumDataFetcher(self.path, pwd)
         else:
             self.ethereum_executor = None
