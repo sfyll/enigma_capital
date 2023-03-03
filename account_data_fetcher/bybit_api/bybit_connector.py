@@ -1,4 +1,4 @@
-import datetime as dt
+from datetime import datetime as dt
 import hashlib
 import hmac
 from json.decoder import JSONDecodeError
