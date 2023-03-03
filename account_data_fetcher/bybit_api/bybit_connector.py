@@ -183,20 +183,20 @@ class bybitApiConnector:
 
                     # Generate error message.
                     error_msg = (
-                        f'{response["ret_msg"]} (ErrCode: {response["ret_code"]})'
+                        f'{response["retMsg"]} (ErrCode: {response["retCode"]})'
                     )
 
                     # Retry non-fatal whitelisted error requests.
-                    if response['ret_code'] in self.retry_codes:
+                    if response['retCode'] in self.retry_codes:
 
                         # 10002, recv_window error; add 2.5 seconds and retry.
-                        if response['ret_code'] == 10002:
+                        if response['retCode'] == 10002:
                             error_msg += '. Added 2.5 seconds to recv_window'
                             self.__X_BAPI_RECV_WINDOW += 2500
 
                         # 10006, ratelimit error; wait until rate_limit_reset_ms
                         # and retry.
-                        elif response['ret_code'] == 10006:
+                        elif response['retCode'] == 10006:
                             self.logger.error(
                                 f'{error_msg}. Ratelimited on current request. '
                                 f'Sleeping, then trying again. Request: {path}'
@@ -216,8 +216,8 @@ class bybitApiConnector:
                     else:
                         raise InvalidRequestError(
                             request=f'{method} {path}: {req_params}',
-                            message=response["ret_msg"],
-                            status_code=response["ret_code"],
+                            message=response["retMsg"],
+                            status_code=response["retCode"],
                             time=dt.utcnow().strftime("%H:%M:%S")
                         )
             else:
