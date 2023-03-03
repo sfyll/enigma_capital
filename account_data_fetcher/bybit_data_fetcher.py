@@ -17,41 +17,53 @@ class bybitDataFetcher(accountFetcherBase):
         self._subaccount_name = sub_account_name
         self.bybit_connector = bybitApiConnector(api_key=self.api_meta_data[self._EXCHANGE].key, api_secret=self.api_meta_data[self._EXCHANGE].secret)
 
-    def get_netliq(self) -> float:
-        netliq = self.__get_balances()
+    def get_netliq(self, accountType="UNIFIED") -> float:
+        netliq = self.__get_balances(accountType)
         return round(netliq, 2)
     
-    def __get_balances(self) -> float:
-        try:
-            derivative_balance = float(self.bybit_connector.get_derivative_balance()[0]["totalEquity"])
-        except InvalidRequestError as e:
-            raise e
+    def __get_balances(self, accountType="UNIFIED") -> float:
+        if accountType=="UNIFIED":
+            try:
+                consolidated_balance = float(self.bybit_connector.get_derivative_balance()[0]["totalEquity"])
+            except InvalidRequestError as e:
+                raise e
 
-        spot_balances: List[dict] = self.bybit_connector.get_all_coin_balance(accountType="SPOT")
+            return consolidated_balance
 
-        spot_netliq: float = 0
+        else:
+            try:
+                derivative_balance = float(self.bybit_connector.get_derivative_balance(accountType=accountType)[0]["totalEquity"])
+            except InvalidRequestError as e:
+                raise e
 
-        for balance in spot_balances:
-            
-            coin_balance = float(balance["walletBalance"])
+            spot_balances: List[dict] = self.bybit_connector.get_all_coin_balance(accountType="SPOT")
 
-            if not coin_balance:
-                continue
+
+            spot_netliq: float = 0
+
+            for balance in spot_balances:
                 
-            name = balance["coin"]
-            
-            if name.upper() in ["BUSD", "USDC", "USDT"]:
-                spot_netliq += coin_balance
-            else:
-                spot_netliq += coin_balance * self.__get_coin_price(name)
+                coin_balance = float(balance["walletBalance"])
 
-        return round(spot_netliq + derivative_balance)
+                if not coin_balance:
+                    continue
+                    
+                name = balance["coin"]
+                
+                if name.upper() in ["BUSD", "USDC", "USDT"]:
+                    spot_netliq += coin_balance
+                else:
+                    spot_netliq += coin_balance * self.__get_coin_price(name)
+
+            return round(spot_netliq + derivative_balance)
 
     def get_positions(self, market: str) -> dict:
         if market == "SPOT":
             return self.__get_spot_positions()
         elif market == "FUTURE":
             return self.__get_derivatives_positions()
+        elif market == "UNIFIED":
+            return self.__get_unified_positions()
         else:
             raise NotImplemented(f"Unkown market {market}")
 
@@ -69,6 +81,30 @@ class bybitDataFetcher(accountFetcherBase):
             quantity = round(float(position["walletBalance"]),3)
             dollar_quantity = quantity if position["coin"].upper() in ["BUSD", "USDC", "USDT"] else \
                               quantity * self.__get_coin_price(position["coin"])
+            if dollar_quantity > 100:
+                data_to_return["Symbol"].append(position["coin"])
+                data_to_return["Multiplier"].append(1)
+                data_to_return["Quantity"].append(quantity)
+                data_to_return["Dollar Quantity"].append(dollar_quantity)
+
+        return data_to_return
+    
+    def __get_unified_positions(self) -> dict:
+        data_to_return = {
+            "Symbol": [],
+            "Multiplier": [],
+            "Quantity": [],
+            "Dollar Quantity": []
+        }
+        
+        positions: List[dict] = self.bybit_connector.get_all_coin_balance(accountType="UNIFIED")
+
+        for position in positions:
+            quantity = round(float(position["walletBalance"]),3)
+            dollar_quantity = 0
+            if quantity > 0:
+                dollar_quantity = 0 if position["coin"].upper() in ["BUSD", "USDC", "USDT", "DAI"] else \
+                                quantity * self.__get_coin_price(position["coin"])
             if dollar_quantity > 100:
                 data_to_return["Symbol"].append(position["coin"])
                 data_to_return["Multiplier"].append(1)
@@ -129,5 +165,6 @@ if __name__ == "__main__":
     #TODO:do below but with asset split, right now gives only derivatives view.
     # print(executor.bybit_connector.get_position(category="linear", settleCoin="USDT"))
     # print(executor.get_positions("SPOT"))
+    print(executor.get_positions("UNIFIED"))
     print(executor.get_positions("FUTURE"))
     # print(executor.get_netliq())
