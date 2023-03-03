@@ -148,7 +148,7 @@ class bybitApiConnector:
                     status_code=400,
                     time=dt.utcnow().strftime("%H:%M:%S")
                 )
-
+            print(f"{path=}, {method=} {req_params=} ")
             try:
                 raw_response: Response = self.__request_handler.handle_requests(
                     url=path,
@@ -199,7 +199,7 @@ class bybitApiConnector:
                         # 10002, recv_window error; add 2.5 seconds and retry.
                         if response['retCode'] == 10002:
                             error_msg += '. Added 2.5 seconds to recv_window'
-                            self.__X_BAPI_RECV_WINDOW += 2500
+                            self.__X_BAPI_RECV_WINDOW = str(int(self.__X_BAPI_RECV_WINDOW) + 2500)
 
                         # 10006, ratelimit error; wait until rate_limit_reset_ms
                         # and retry.
