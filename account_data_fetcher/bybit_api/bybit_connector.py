@@ -40,7 +40,7 @@ class bybitApiConnector:
             return self.__wallet_balance(accountType=accountType)["result"]["list"]
 
     def get_position(self, **kwargs) -> List[dict]:
-        module = "/v5/position/list"
+        module = "v5/position/list"
 
         url = self.__request_handler.endpoint_extension(self.__ENDPOINT, module)
         
@@ -67,7 +67,7 @@ class bybitApiConnector:
 
 
     def get_all_coin_balance(self, **kwargs) -> List[dict]:
-        module = "/v5/asset/transfer/query-account-coins-balance"
+        module = "v5/asset/transfer/query-account-coins-balance"
 
         url = self.__request_handler.endpoint_extension(self.__ENDPOINT, module)
             
@@ -80,7 +80,7 @@ class bybitApiConnector:
         return response["result"]["balance"]
 
     def get_last_traded_price(self, **kwargs)-> dict[str, str]:
-        module = "/spot/v3/public/quote/ticker/price"
+        module = "spot/v3/public/quote/ticker/price"
         
         url = self.__request_handler.endpoint_extension(self.__ENDPOINT, module)
         
@@ -93,7 +93,7 @@ class bybitApiConnector:
         return response["result"]
 
     def __wallet_balance(self, **kwargs) -> dict:
-        module = "/v5/account/wallet-balance"
+        module = "v5/account/wallet-balance"
         
         url = self.__request_handler.endpoint_extension(self.__ENDPOINT, module)
         
