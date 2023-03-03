@@ -7,7 +7,7 @@ from account_data_fetcher.bybit_api.exception import FailedRequestError, Invalid
 
 from utilities.account_data_fetcher_base import accountFetcherBase
 
-
+#TODO make a config object to be parsed so that we can modify which account type to fetch
 class bybitDataFetcher(accountFetcherBase):
     _EXCHANGE = "BYBIT"
     _ENDPOINT = 'https://api.bybit.com'
