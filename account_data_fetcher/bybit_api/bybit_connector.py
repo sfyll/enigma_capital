@@ -148,7 +148,7 @@ class bybitApiConnector:
                     status_code=400,
                     time=dt.utcnow().strftime("%H:%M:%S")
                 )
-            print(f"{path=}, {method=} {req_params=} ")
+
             try:
                 raw_response: Response = self.__request_handler.handle_requests(
                     url=path,
