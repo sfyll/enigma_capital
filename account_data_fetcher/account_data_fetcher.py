@@ -198,7 +198,7 @@ class AccountDataFetcher:
             tradestation_positions = self.generate_empty_global_positions_dict()
 
         if self.bybit_executor:
-            bybit_spot_positions = self.bybit_executor.get_positions("SPOT")
+            bybit_spot_positions = self.bybit_executor.get_positions("UNIFIED")
             bybit_derivative_positions = self.bybit_executor.get_positions("FUTURE")
         else:
             bybit_spot_positions = self.generate_empty_global_positions_dict()
