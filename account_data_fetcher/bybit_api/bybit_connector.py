@@ -16,7 +16,7 @@ class bybitApiConnector:
     __X_BAPI_RECV_WINDOW = "5000"
     
     def __init__(self, api_key: str, api_secret: str, max_retries: int = 10, 
-                force_retry: bool = True, retry_delay: int = 3) -> None:
+                force_retry: bool = True, retry_delay: int = 3, retry_codes: Optional[set] = None) -> None:
         self.logger = logging.getLogger(__name__) 
         self.__request_handler: requestHandler = requestHandler()
         self.api_key: str = api_key
@@ -24,6 +24,13 @@ class bybitApiConnector:
         self.max_retries: int = max_retries
         self.force_retry: bool = force_retry
         self.retry_delay: int = retry_delay
+
+        # Set whitelist of non-fatal Bybit status codes to retry on.
+        if retry_codes is None:
+            self.retry_codes = {10002, 10006, 30034, 30035, 130035, 130150}
+        else:
+            self.retry_codes = retry_codes
+
 
     def get_derivative_balance(self, accountType="UNIFIED", coin: Optional[list] =None) -> List[dict]:
         if coin:
