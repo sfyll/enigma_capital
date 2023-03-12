@@ -13,4 +13,4 @@ cd $ENIGMA
 
 source env/bin/activate
 
-python3 -m thesis_monitoring.runner --log-file ~/log/hkd_thesis_monitoring.log --seconds 604800 --request-type HKD -v -q --starting-date 2022-01-01
+python3 -m thesis_monitoring.runner --log-file ~/log/hkd_thesis_monitoring.log --seconds 604800 --request-type HKD -v -q --starting-date 2022-06-01

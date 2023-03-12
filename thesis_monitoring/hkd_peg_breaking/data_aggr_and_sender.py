@@ -12,7 +12,7 @@ from utilities.telegram_handler import telegramHandler
 
 class dataAggrAndSender(telegramHandler):
     __LIBOR_CSV_PATH = "/LIBOR USD.csv" #didn't find free historical source :( , link is : http://iborate.com/usd-libor/
-    def __init__(self, password: str, beginning_date: str) -> None:
+    def __init__(self, password: str, beginning_date: str, to_telegram = True) -> None:
         current_path = Path(os.path.realpath(os.path.dirname(__file__)))
         super().__init__(str(current_path.parent), password)
         self.current_path: str = str(current_path)
@@ -24,6 +24,7 @@ class dataAggrAndSender(telegramHandler):
         self.hibor_libor_df : Optional[pd.DataFrame] = None
         self.hibor_libor_df_daily : Optional[pd.DataFrame] = None
         self.beginning_date = beginning_date
+        self.to_telegram = to_telegram
 
     async def aggr_and_send_data_hkd(self) -> None:
         await self.plot_and_send_historical_rates()
@@ -49,7 +50,10 @@ class dataAggrAndSender(telegramHandler):
 
         plt.savefig(self.current_path+"historical_rates.png")
 
-        await self.send_photo_to_telegram(self.current_path+"historical_rates.png")
+        if self.to_telegram:
+            await self.send_photo_to_telegram(self.current_path+"historical_rates.png")
+        else:
+            plt.show()
 
     async def plot_and_send_daily_rates(self, plot_spread=False) -> None:
         self.get_data_daily_on()
@@ -67,8 +71,11 @@ class dataAggrAndSender(telegramHandler):
                 self.hibor_libor_df_daily[values + " USD-HKD spread as perc. of US Rates"].plot(ax=a[1], title=values + " USD-HKD spread as perc. of US Rates", sharex=True)
 
         plt.savefig(self.current_path+"historical_rates_daily.png")
-        
-        await self.send_photo_to_telegram(self.current_path+"historical_rates_daily.png")
+
+        if self.to_telegram:
+            await self.send_photo_to_telegram(self.current_path+"historical_rates_daily.png")
+        else:
+            plt.show()
 
     def get_data_historical(self) -> None:
         url_base = "https://api.hkma.gov.hk/public/market-data-and-statistics/monthly-statistical-bulletin/er-ir/hk-interbank-ir-daily"
@@ -162,7 +169,10 @@ class dataAggrAndSender(telegramHandler):
             
         plt.savefig(self.current_path+"/renminbi_facility.png")
 
-        await self.send_photo_to_telegram(self.current_path+"/renminbi_facility.png")
+        if self.to_telegram:
+            await self.send_photo_to_telegram(self.current_path+"/renminbi_facility.png")
+        else:
+            plt.show()
 
     async def get_and_process_monetary_aggregates(self) -> None:
         url = "https://api.hkma.gov.hk/public/market-data-and-statistics/daily-monetary-statistics/daily-figures-monetary-base"
@@ -183,7 +193,10 @@ class dataAggrAndSender(telegramHandler):
         
         plt.savefig(self.current_path+"/monetary_aggregates.png")
 
-        await self.send_photo_to_telegram(self.current_path+"/monetary_aggregates.png")
+        if self.to_telegram:
+            await self.send_photo_to_telegram(self.current_path+"/monetary_aggregates.png")
+        else:
+            plt.show()
 
     async def get_economic_aggregates(self) -> None:
         df = self.get_merged_df_cpi_and_gdp(self.get_gdp(), self.get_cpi())
@@ -199,8 +212,10 @@ class dataAggrAndSender(telegramHandler):
         plt.tight_layout()
        
         plt.savefig(self.current_path+"/GDP_and_CPI.png")
-
-        await self.send_photo_to_telegram(self.current_path+"/GDP_and_CPI.png")
+        if self.to_telegram:
+            await self.send_photo_to_telegram(self.current_path+"/GDP_and_CPI.png")
+        else:
+            plt.show()
 
     def get_gdp(self) -> pd.DataFrame:
         url = "https://www.censtatd.gov.hk/api/get.php?id=30&lang=en&param=N4IgxgbiBcoMJwJqJqAjDEAGHu+4HYB9E00gWn3xABoQiAXIzLW+gB2emxAF86AiqhAZuAMTaMuPOkU4s+dAOIARAApEwAewC27LQDsApgYbCpC2fO4Y6AQwAmUbgGZmvfiADOz0HOkATGxwAPIAcjAA2iCIWohEaA6cAKREBiAAunQAygCCotECWgIJSUSp6RmeADYwDABOAK5GvEA"
@@ -246,6 +261,6 @@ if __name__ == "__main__":
     logger: logging.Logger = logging.getLogger()
     pwd = getpass("provide password for pk:")
     current_path = Path(os.path.realpath(os.path.dirname(__file__)))
-    beginning_date = "2020-01-01"
-    executor = dataAggrAndSender(pwd, beginning_date)
-    asyncio.run(executor.aggr_and_send_data())
+    beginning_date = "2022-06-01"
+    executor = dataAggrAndSender(pwd, beginning_date, False)
+    asyncio.run(executor.aggr_and_send_data_hkd())
