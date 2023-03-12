@@ -5,6 +5,7 @@ import logging
 import os
 from typing import Callable, Dict, List, Optional
 
+from eth_abi import encode_single, encode_abi
 from web3 import Web3
 
 from account_data_fetcher.ethereum.config import *
@@ -100,26 +101,30 @@ class ethereumDataFetcher(accountFetcherBase):
     def __get_token_balances_by_coin(self) -> dict:
         balance_by_coin: dict[str, float] = {}
 
-        for coin, contract in self.contract_by_coin.items():
-            for my_address in self.address_of_interest: 
-                    result = contract.functions.balanceOf(Web3.toChecksumAddress(my_address)).call()
-                    if coin in balance_by_coin.keys():
-                        balance_by_coin[coin.upper()] += int(result) / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
-                    else:
-                        balance_by_coin[coin.upper()] = int(result)
+        multi_call_result = self.__query_multi_call()
+
+        counter: int = 0
+        for coin, _ in self.__ADDRESS_BY_COIN.items():
+            for _ in self.address_of_interest:
+               balance = self.w3.toInt(multi_call_result[counter])
+               if coin in balance_by_coin:
+                   balance_by_coin[coin] += balance / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
+               else:
+                   balance_by_coin[coin] = balance / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
+               counter += 1
 
         return balance_by_coin
-
-    #Below is to debug helios client
-    def encode_token_balances_by_coin_calls(self):
-        calls: List[str] = []
-        addresses: List[str] = []
-        for coin, contract in self.contract_by_coin.items():
-            for my_address in self.address_of_interest:
-                calls.append(contract.encodeABI(fn_name="balanceOf", args=[Web3.toChecksumAddress(my_address)]))
-                addresses.append(Web3.toChecksumAddress(self.__ADDRESS_BY_COIN[coin]))
-
-        return calls, addresses
+    
+    def __query_multi_call(self) -> List[bytes]:
+        calls: List[tuple] = []
+        
+        for coin, token_address in self.__ADDRESS_BY_COIN.items():
+            for address in self.address_of_interest:
+                balance_call_data = self.contract_by_coin[coin].encodeABI(fn_name='balanceOf', args=[Web3.toChecksumAddress(address)])  
+                calls.append((token_address, balance_call_data))
+                
+        multicall_contract = self.w3.eth.contract(address=MULTICALL_3_ADDRESS, abi=MULTICALL3_ABI)
+        return multicall_contract.functions.aggregate(tuple(calls)).call()[1]
 
     def get_netliq(self, get_price_from_coingecko: Callable) -> float:
         balance_by_coin: dict = self.__get_total_balance_by_coin()
@@ -183,6 +188,30 @@ class ethereumDataFetcher(accountFetcherBase):
             prices_per_coin=price_per_coin
         )
 
+    #Below is to debug helios client
+    def encode_token_balances_by_coin_calls(self):
+        calls: List[str] = []
+        addresses: List[str] = []
+        for coin, contract in self.contract_by_coin.items():
+            for my_address in self.address_of_interest:
+                calls.append(contract.encodeABI(fn_name="balanceOf", args=[Web3.toChecksumAddress(my_address)]))
+                addresses.append(Web3.toChecksumAddress(self.__ADDRESS_BY_COIN[coin]))
+
+        return calls, addresses
+    
+    def get_token_balances_by_coin_single_calls(self) -> dict:
+        balance_by_coin: dict[str, float] = {}
+
+        for coin, contract in self.contract_by_coin.items():
+            for my_address in self.address_of_interest: 
+                    result = contract.functions.balanceOf(Web3.toChecksumAddress(my_address)).call()
+                    if coin in balance_by_coin.keys():
+                        balance_by_coin[coin.upper()] += int(result) / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
+                    else:
+                        balance_by_coin[coin.upper()] = int(result)
+
+        return balance_by_coin
+
 
 if __name__ == '__main__':
     from getpass import getpass
@@ -195,6 +224,8 @@ if __name__ == '__main__':
     current_path = os.path.realpath(os.path.dirname(__file__))
     price_fetcher = coingeckoDataFetcher().get_prices
     executor = ethereumDataFetcher(current_path, pwd)
+    # print(executor.get_token_balances_by_coin())
+    # print(executor.get_token_balances_by_coin_single_calls())
     balance = executor.get_netliq(price_fetcher)
     print(f"{balance=}")
     # calls, addresses = executor.encode_token_balances_by_coin_calls()
