@@ -32,7 +32,7 @@ class DepositAndWithdraw:
         return file_name in onlyfiles
     
 class depositAndWithdrawHandler:
-    __SUPPORTED_EXCHANGE: set = ("BINANCE", "BYBIT", "DYDX", "ETHEREUM", "IB", "TRADESTATION")    
+    __SUPPORTED_EXCHANGE: set = ("BINANCE", "BYBIT", "DYDX", "ETHEREUM", "IB", "TRADESTATION", "KRAKEN")    
     def __init__(self) -> None:
         print(f"We will now prompt you some information so that your deposit and withdraw can be handled. \n Please note the list of supported exchange is the following {self.__SUPPORTED_EXCHANGE}")
         self.data: DepositAndWithdraw = self.__get_data()
