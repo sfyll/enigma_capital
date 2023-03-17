@@ -14,6 +14,7 @@ from account_data_fetcher.trades_station_data_fetcher import tradesStationDataFe
 from account_data_fetcher.bybit_data_fetcher import bybitDataFetcher
 from account_data_fetcher.ethereum_data_fetcher import ethereumDataFetcher
 from account_data_fetcher.coingecko_data_fetcher import coingeckoDataFetcher
+from account_data_fetcher.kraken_data_fetcher import krakenDataFetcher
 
 class AccountDataFetcher:
     def __init__(self, pwd: str, ib_fetching_method: str, exchange_list: List[str]) -> None:
@@ -57,6 +58,12 @@ class AccountDataFetcher:
             self.ethereum_executor = ethereumDataFetcher(self.path, pwd)
         else:
             self.ethereum_executor = None
+
+        if "Kraken" in exchange_list:
+            self.kraken_executor = krakenDataFetcher(self.path, pwd)
+        else:
+            self.kraken_executor = None
+
 
         if "FTX" in exchange_list:
             raise FileNotFoundError("You got Rekt")
@@ -160,7 +167,12 @@ class AccountDataFetcher:
         if self.ethereum_executor:
             ethereum_balance = self.ethereum_executor.get_netliq(self.price_fetcher)
         else:
-            ethereum_balance = 0.0        
+            ethereum_balance = 0.0  
+
+        if self.kraken_executor:
+            kraken_balance = self.kraken_executor.get_netliq()
+        else:
+            kraken_balance = 0.0          
 
         balances = {
             "binance": binance_dollar_balance + binance_dollar_isolated_margin_balance,
@@ -169,7 +181,8 @@ class AccountDataFetcher:
             "dydx": dydx_balance,
             "bybit": bybit_balance,
             "ethereum": ethereum_balance,
-            "netliq": binance_dollar_balance + binance_dollar_isolated_margin_balance + ib_balance + tradestation_balance + dydx_balance + bybit_balance + ethereum_balance 
+            'kraken':kraken_balance,
+            "netliq": binance_dollar_balance + binance_dollar_isolated_margin_balance + ib_balance + tradestation_balance + dydx_balance + bybit_balance + ethereum_balance + kraken_balance
         }
         
         return balances 
@@ -209,6 +222,11 @@ class AccountDataFetcher:
         else:
             ethereum_position = self.generate_empty_global_positions_dict()
 
+        if self.kraken_executor:
+            kraken_position = self.kraken_executor.get_positions()
+        else:
+            kraken_position = self.generate_empty_global_positions_dict()
+
         positions = {
             "binance_spot": binance_spot_positions,
             "binance_margin": binance_margin_positions,
@@ -217,7 +235,8 @@ class AccountDataFetcher:
             "dydx": dydx_positions,
             "bybit_spot": bybit_spot_positions,
             "bybit_derivatives" :bybit_derivative_positions,
-            "ethereum_position": ethereum_position
+            "ethereum_position": ethereum_position,
+            "kraken": kraken_position
         }
         
         return positions 
