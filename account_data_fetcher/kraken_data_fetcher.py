@@ -170,9 +170,5 @@ if __name__ == "__main__":
     from getpass import getpass
     pwd = getpass("provide password for pk:")
     executor = krakenDataFetcher(os.path.realpath(os.path.dirname(__file__)), pwd)
-    #TODO:do below but with asset split, right now gives only derivatives view.
-    # print(executor.bybit_connector.get_position(category="linear", settleCoin="USDT"))
-    # print(executor.get_positions("SPOT"))
     print(executor.get_netliq())
     print(executor.get_positions())
-    # print(executor.get_netliq())
