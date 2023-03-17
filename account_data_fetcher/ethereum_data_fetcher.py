@@ -5,7 +5,6 @@ import logging
 import os
 from typing import Callable, Dict, List, Optional
 
-from eth_abi import encode_single, encode_abi
 from web3 import Web3
 
 from account_data_fetcher.ethereum.config import *
@@ -226,11 +225,11 @@ if __name__ == '__main__':
     executor = ethereumDataFetcher(current_path, pwd)
     # print(executor.get_token_balances_by_coin())
     # print(executor.get_token_balances_by_coin_single_calls())
-    balance = executor.get_netliq(price_fetcher)
-    print(f"{balance=}")
-    # calls, addresses = executor.encode_token_balances_by_coin_calls()
-    # print(f"{calls=}")
-    # print(f"{addresses=}")
+    # balance = executor.get_netliq(price_fetcher)
+    # print(f"{balance=}")
+    calls, addresses = executor.encode_token_balances_by_coin_calls()
+    print(f"{calls=}")
+    print(f"{addresses=}")
     # print(len(calls))
     # print(len(addresses))
     # print(balances)
