@@ -52,9 +52,12 @@ class requestHandler:
                 url=url, params=args, verify=True)
 
         elif method == 'post':
-
-            response = requests.post(
-                url=url, params=args, verify=True)
+            if headers:
+                response = requests.post(
+                url=url, data=args, verify=True, headers=headers)
+            else:
+                response = requests.post(
+                    url=url, data=args, verify=True)
 
         elif method == 'put':
 
