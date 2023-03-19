@@ -6,15 +6,16 @@ from typing import List
 
 import pandas as pd
 
-from account_data_fetcher.ib_data_fetcher_api import InteractiveBrokersAppAsync
-from account_data_fetcher.ib_data_fetcher_flex_queries import ibDataFetcher
-from account_data_fetcher.binance_data_fetcher import binanceDataFetcher
-from account_data_fetcher.dydx_data_fetcher import dydxDataFetcher
-from account_data_fetcher.trades_station_data_fetcher import tradesStationDataFetcher
-from account_data_fetcher.bybit_data_fetcher import bybitDataFetcher
-from account_data_fetcher.ethereum_data_fetcher import ethereumDataFetcher
-from account_data_fetcher.coingecko_data_fetcher import coingeckoDataFetcher
-from account_data_fetcher.kraken_data_fetcher import krakenDataFetcher
+from account_data_fetcher.interactive_brokers.ib_data_fetcher_api import InteractiveBrokersAppAsync
+from account_data_fetcher.interactive_brokers.ib_data_fetcher_flex_queries import ibDataFetcher
+from account_data_fetcher.offchain.binance_data_fetcher import binanceDataFetcher
+from account_data_fetcher.offchain.dydx_data_fetcher import dydxDataFetcher
+from account_data_fetcher.tradestation.trades_station_data_fetcher import tradesStationDataFetcher
+from account_data_fetcher.bybit.bybit_data_fetcher import bybitDataFetcher
+from account_data_fetcher.onchain.ethereum_data_fetcher import ethereumDataFetcher
+from account_data_fetcher.offchain.coingecko_data_fetcher import coingeckoDataFetcher
+from account_data_fetcher.kraken.kraken_data_fetcher import krakenDataFetcher
+from account_data_fetcher.onchain.roostock_data_fetcher import rootStockDataFetcher
 
 class AccountDataFetcher:
     def __init__(self, pwd: str, ib_fetching_method: str, exchange_list: List[str]) -> None:
@@ -64,6 +65,10 @@ class AccountDataFetcher:
         else:
             self.kraken_executor = None
 
+        if "Rootstock" in exchange_list:
+            self.rsk_executor = rootStockDataFetcher(self.path, pwd)
+        else:
+            self.rsk_executor = None
 
         if "FTX" in exchange_list:
             raise FileNotFoundError("You got Rekt")
@@ -174,6 +179,11 @@ class AccountDataFetcher:
         else:
             kraken_balance = 0.0          
 
+        if self.rsk_executor:
+            onchain_balance = self.rsk_executor.get_netliq(self.price_fetcher)
+        else:
+            onchain_balance = 0.0          
+
         balances = {
             "binance": binance_dollar_balance + binance_dollar_isolated_margin_balance,
             "interactive_brokers": ib_balance,
@@ -182,6 +192,7 @@ class AccountDataFetcher:
             "bybit": bybit_balance,
             "ethereum": ethereum_balance,
             'kraken':kraken_balance,
+            'onchain': onchain_balance,
             "netliq": binance_dollar_balance + binance_dollar_isolated_margin_balance + ib_balance + tradestation_balance + dydx_balance + bybit_balance + ethereum_balance + kraken_balance
         }
         
@@ -227,6 +238,11 @@ class AccountDataFetcher:
         else:
             kraken_position = self.generate_empty_global_positions_dict()
 
+        if self.rsk_executor:
+            onchain_position = self.rsk_executor.get_positions(self.price_fetcher)
+        else:
+            onchain_position = self.generate_empty_global_positions_dict()
+
         positions = {
             "binance_spot": binance_spot_positions,
             "binance_margin": binance_margin_positions,
@@ -236,7 +252,8 @@ class AccountDataFetcher:
             "bybit_spot": bybit_spot_positions,
             "bybit_derivatives" :bybit_derivative_positions,
             "ethereum_position": ethereum_position,
-            "kraken": kraken_position
+            "kraken": kraken_position,
+            "onchain": onchain_position
         }
         
         return positions 
