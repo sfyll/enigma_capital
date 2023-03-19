@@ -32,7 +32,7 @@ class DepositAndWithdraw:
         return file_name in onlyfiles
     
 class depositAndWithdrawHandler:
-    __SUPPORTED_EXCHANGE: set = ("BINANCE", "BYBIT", "DYDX", "ETHEREUM", "IB", "TRADESTATION", "KRAKEN")    
+    __SUPPORTED_EXCHANGE: set = ("BINANCE", "BYBIT", "DYDX", "ETHEREUM", "IB", "TRADESTATION", "KRAKEN", "ONCHAIN")    
     def __init__(self) -> None:
         print(f"We will now prompt you some information so that your deposit and withdraw can be handled. \n Please note the list of supported exchange is the following {self.__SUPPORTED_EXCHANGE}")
         self.data: DepositAndWithdraw = self.__get_data()
@@ -51,7 +51,17 @@ class depositAndWithdrawHandler:
         date: Optional[str] = input("If the transaction is not from today, specify the date in dd/mm/yyy format, otherwise press enter and it'll get generated automatically \n")
         if not date:
             date = datetime.utcnow().strftime('%d/%m/%Y')
+        else:
+            if not self.is_valid_date(date, "%d/%m/%Y"):
+                raise ValueError("Please provide a valid date")
         return date
+    
+    def is_valid_date(self, date_str: str, format: str) -> bool:
+        try:
+            datetime.strptime(date_str, format)
+            return True
+        except ValueError:
+            return False 
 
     def get_from_exchange(self) -> Optional[str]:
         from_exchange: Optional[str] = input("Please insert from which exchange you withdrew. If None (money inflow), press enter \n")
