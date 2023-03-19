@@ -34,7 +34,6 @@ class tradesStationDataFetcher(accountFetcherBase):
 
     def __init__(self, path: str, password: str, paper_trading = False,
                 cache_state = True, refresh_enabled = True) -> None:
-        print(path)
         super().__init__(path, password)
         self.config = {
             'client_id': self.api_meta_data[self.__EXCHANGE].key,
@@ -155,9 +154,9 @@ class tradesStationDataFetcher(accountFetcherBase):
         """
 
         # Grab the current directory of the client file, that way we can store the JSON file in the same folder.
-        dir_path = os.path.dirname(os.path.realpath(__file__))
+        parent_dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
         filename = '.ts_state_enc.txt'
-        file_path = os.path.join(dir_path, filename)
+        file_path = os.path.join(parent_dir_path, filename)
 
         try:
             # Define the initalized state, these are the default values.
