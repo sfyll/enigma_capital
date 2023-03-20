@@ -193,7 +193,7 @@ class AccountDataFetcher:
             "ethereum": ethereum_balance,
             'kraken':kraken_balance,
             'onchain': onchain_balance,
-            "netliq": binance_dollar_balance + binance_dollar_isolated_margin_balance + ib_balance + tradestation_balance + dydx_balance + bybit_balance + ethereum_balance + kraken_balance
+            "netliq": binance_dollar_balance + binance_dollar_isolated_margin_balance + ib_balance + tradestation_balance + dydx_balance + bybit_balance + ethereum_balance + kraken_balance + onchain_balance
         }
         
         return balances 
