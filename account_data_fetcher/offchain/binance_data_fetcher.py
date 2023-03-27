@@ -1,4 +1,6 @@
 import datetime
+from datetime import timedelta
+import csv
 import logging
 import os
 from os import listdir
@@ -26,12 +28,6 @@ class binanceDataFetcher(accountFetcherBase):
         onlyfiles = []
         onlyfiles += [f for f in listdir(path) if isfile(join(path, f)) and f != ".DS_Store" and getsize(join(path, f)) > 0]
         return onlyfiles
-    
-    def get_deposit_history(self) -> List[dict]:
-        return self._client.deposit_history()
-
-    def get_withdraw_history(self) -> List[dict]:
-        return self._client.withdraw_history()
 
     def get_account_snapshot(self, account_type: str = "SPOT") -> List[dict]:
         return self._client.account_snapshot(account_type)
@@ -93,6 +89,73 @@ class binanceDataFetcher(accountFetcherBase):
             df.sort_index(inplace=True)
 
         df.to_csv(file_loc+symbol+start.replace("/", "-")+"_"+end.replace("/", "-")+".csv")
+
+    def get_deposit_history(self, path: str, start_date: str = "01/01/2020", end_date: Optional[str] = None) -> None:
+        # Convert start_date and end_date to timestamps
+        start_timestamp = int(time.mktime(datetime.datetime.strptime(start_date, "%m/%d/%Y").timetuple()) * 1000)
+        
+        if end_date is None:
+            end_timestamp = int(time.time() * 1000)
+        else:
+            end_timestamp = int(time.mktime(datetime.datetime.strptime(end_date, "%m/%d/%Y").timetuple()) * 1000)
+        
+       # Prepare to fetch deposits in rolling 90-day intervals
+        interval = timedelta(days=90)
+        current_start_timestamp = start_timestamp
+        current_end_timestamp = min(current_start_timestamp + int(interval.total_seconds() * 1000), end_timestamp)
+        
+        deposits = []
+
+        # Fetch deposits in rolling 90-day intervals
+        while current_start_timestamp < end_timestamp:
+            current_deposits = self._client.deposit_history(startTime=current_start_timestamp, endTime=current_end_timestamp)
+            deposits.extend(current_deposits)
+            
+            current_start_timestamp = current_end_timestamp
+            current_end_timestamp = min(current_start_timestamp + int(interval.total_seconds() * 1000), end_timestamp)
+
+        df = pd.DataFrame(deposits)
+
+        #for coinly...
+        df.rename(columns={"insertTime":"Date(UTC)"}, inplace=True)
+        df['Date(UTC)'] = [datetime.datetime.fromtimestamp(x / 1000.0) for x in df['Date(UTC)']]
+        df['Status'] = ['Completed' for x in df['status']]
+        df.drop(columns={"id", 'addressTag', 'transferType', 'confirmTimes', 'unlockConfirm', 'walletType'}, inplace=True)
+
+        df.to_csv(path)
+
+    def get_withdraw_history(self, path: str, start_date: str = "01/01/2020", end_date: Optional[str] = None) -> None:
+        # Convert start_date and end_date to timestamps
+        start_timestamp = int(time.mktime(datetime.datetime.strptime(start_date, "%m/%d/%Y").timetuple()) * 1000)
+        
+        if end_date is None:
+            end_timestamp = int(time.time() * 1000)
+        else:
+            end_timestamp = int(time.mktime(datetime.datetime.strptime(end_date, "%m/%d/%Y").timetuple()) * 1000)
+        
+       # Prepare to fetch deposits in rolling 90-day intervals
+        interval = timedelta(days=90)
+        current_start_timestamp = start_timestamp
+        current_end_timestamp = min(current_start_timestamp + int(interval.total_seconds() * 1000), end_timestamp)
+        
+        deposits = []
+
+        # Fetch deposits in rolling 90-day intervals
+        while current_start_timestamp < end_timestamp:
+            current_deposits = self._client.withdraw_history(startTime=current_start_timestamp, endTime=current_end_timestamp)
+            deposits.extend(current_deposits)
+            
+            current_start_timestamp = current_end_timestamp
+            current_end_timestamp = min(current_start_timestamp + int(interval.total_seconds() * 1000), end_timestamp)
+
+        df = pd.DataFrame(deposits)
+        
+        #for coinly...
+        df.rename(columns={"completeTime":"Date(UTC)"}, inplace=True)
+
+        df.drop(columns={"id", 'applyTime', 'transferType', 'info', 'confirmNo', 'walletType', 'txKey'}, inplace=True)
+
+        df.to_csv(path)
 
     def convert_balances_to_dollars(self, binance_balances: List[dict]) -> int:
         netliq_in_dollars = 0
@@ -175,8 +238,10 @@ if __name__ == "__main__":
     logging.basicConfig(level=numeric_level, format='%(levelname)s:%(asctime)s:%(message)s', filename=log_filename) 
     logger: logging.Logger = logging.getLogger()
     pwd = getpass("provide password for pk:")
-    executor = binanceDataFetcher(os.path.realpath(os.path.dirname(__file__)), pwd, logger)
+    current_path = os.path.realpath(os.path.dirname(__file__))
+    parent_path = os.path.dirname(current_path)
+    executor = binanceDataFetcher(parent_path, pwd, logger)
     # balances = executor.get_spot_positions()
     # print(balances)
-    path = os.path.expanduser("~") + "/Documents/Trading/Tax/historical_prices/"
-    executor.save_historical_klines("ETHUSDT", path)
+    # executor.get_deposit_history(path=path)
+    # executor.get_withdraw_history(path=path)
