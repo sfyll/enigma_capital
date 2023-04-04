@@ -710,13 +710,13 @@ class tradesStationDataFetcher(accountFetcherBase):
             args=params,
             headers=self.headers()
         )
-
-        for wallet in response["Wallets"]:
-            if "USD" in wallet["Currency"] == "USDC":
-                self.account_meta_data[wallet["AccountID"]].CashBalance += float(wallet["Balance"])
-                self.account_meta_data[wallet["AccountID"]].Equity += float(wallet["Balance"])
-                self.account_meta_data[wallet["AccountID"]].MarketValue += float(wallet["Balance"])
-                self.account_meta_data[wallet["AccountID"]].TodaysProfitLoss += float(wallet["UnrealizedProfitLossAccountCurrency"])
+        if response['Wallets']:
+            for wallet in response["Wallets"]:
+                if "USD" in wallet["Currency"] == "USDC":
+                    self.account_meta_data[wallet["AccountID"]].CashBalance += float(wallet["Balance"])
+                    self.account_meta_data[wallet["AccountID"]].Equity += float(wallet["Balance"])
+                    self.account_meta_data[wallet["AccountID"]].MarketValue += float(wallet["Balance"])
+                    self.account_meta_data[wallet["AccountID"]].TodaysProfitLoss += float(wallet["UnrealizedProfitLossAccountCurrency"])
 
         return response
 
