@@ -5,3 +5,8 @@ __pycache__/
 *.csv
 .api_enc.txt
 .pk.txt
+*.json
+*.png
+/monitor*
+!monitor/hkd_peg_breaking/
+!monitor/portfolio_monitor/
