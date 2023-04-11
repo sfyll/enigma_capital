@@ -61,7 +61,6 @@ class Runner:
             self.logger.debug(f"running periodic task with following second delay: {seconds}")
             #always start by sending the update
             today =  datetime.today() - timedelta(days=1)
-            print(today)
             self.netliq_to_telegram = netliqToTelgram(pwd)
             while True:
                 is_new_day, potential_today = self.is_new_day(self.netliq_to_telegram.netliq_path, today)
