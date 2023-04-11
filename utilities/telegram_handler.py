@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Optional
 
 import telegram
 
@@ -18,11 +19,19 @@ class telegramHandler(accountFetcherBase):
                 photo=open(file_path, "rb")
             )
 
-    async def send_text_to_telegram(self, text: str) -> None:
-        return await self.bot.send_message(
-                self.channel_id,
-                text=text
-        )
+    async def send_text_to_telegram(self, text: str, parse_mode: Optional[str] = None) -> None:
+        if not parse_mode:
+            return await self.bot.send_message(
+                    self.channel_id,
+                    text=text,
+            )
+        
+        else:
+             return await self.bot.send_message(
+                    self.channel_id,
+                    text=text,
+                    parse_mode=parse_mode     
+            )
 
 
 if __name__ == '__main__':
