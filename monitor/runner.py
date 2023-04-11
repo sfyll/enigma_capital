@@ -1,6 +1,6 @@
 import argparse
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import functools
 from getpass import getpass
 import logging
@@ -59,10 +59,15 @@ class Runner:
 
         async def periodic_netliq_update(self, pwd, seconds: int) -> None:
             self.logger.debug(f"running periodic task with following second delay: {seconds}")
+            #always start by sending the update
+            today =  datetime.today() - timedelta(days=1)
+            print(today)
             self.netliq_to_telegram = netliqToTelgram(pwd)
             while True:
-                if self.is_new_day(self.netliq_to_telegram.netliq_path):
+                is_new_day, potential_today = self.is_new_day(self.netliq_to_telegram.netliq_path, today)
+                if is_new_day:
                     await self.netliq_to_telegram.send_yesterday()
+                    today = potential_today
                 await asyncio.sleep(seconds)
 
         def is_new_week(self) -> bool:
@@ -75,22 +80,22 @@ class Runner:
             if today_datetime.isocalendar().week != datetime_df.isocalendar().week:
                 return True
 
-        def is_new_day(self, path: str, today_datetime: Optional[datetime] = None) -> bool:
+        def is_new_day(self, path: str, today_datetime: Optional[datetime] = None) -> tuple[bool, int]:
             try:
                 df = pd.read_csv(path)
             except FileNotFoundError:
                 return True
             if not today_datetime:
                 today_datetime = datetime.today()
-            today = today_datetime.weekday()            
+            today = today_datetime.weekday()
             last_day_df = df["date"].iloc[-1]
             datetime_df = datetime.strptime(last_day_df, "%Y-%m-%d %H:%M:%S")
             today_df = datetime_df.weekday()
             self.logger.debug(f"{today_datetime=}, {last_day_df=}")
             if today_datetime.isocalendar().week != datetime_df.isocalendar().week:
-                return True
+                return True,  datetime.today()
             else:
-                return today != today_df
+                return today != today_df,  datetime.today()
 
         def create_task(self, function: Callable, *args) -> asyncio.Task:
             return self.loop.create_task(function(*args))
