@@ -7,7 +7,7 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from thesis_monitoring.hkd_peg_breaking.fetch_data import dataFetcher
+from monitor.hkd_peg_breaking.fetch_data import dataFetcher
 from utilities.telegram_handler import telegramHandler
 
 class dataAggrAndSender(telegramHandler):
@@ -31,7 +31,7 @@ class dataAggrAndSender(telegramHandler):
         await self.plot_and_send_daily_rates()
         await self.get_and_process_renminbi_facility_data()
         await self.get_and_process_monetary_aggregates()
-        await self.get_economic_aggregates()
+        # await self.get_economic_aggregates()
 
     async def plot_and_send_historical_rates(self, plot_spread=False) -> None:
         self.get_data_historical()
