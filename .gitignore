@@ -7,6 +7,8 @@ __pycache__/
 .pk.txt
 *.json
 *.png
-/monitor*
+/monitor/*
 !monitor/hkd_peg_breaking/
 !monitor/portfolio_monitor/
+!monitor/*.sh
+!monitor/*.py
