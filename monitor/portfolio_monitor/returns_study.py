@@ -1,69 +1,102 @@
 from datetime import datetime
+from math import isnan
 import os
 from typing import Optional
 
+import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
 class returnStudy:
     def __init__(self):
-        self.netliq_path = self.get_netliq_path()
+        self.netliq_path, self.transactions_path = self.get_netliq_path()
         
     def get_netliq_path(self) -> str:
-        self.current_path = os.path.realpath(os.path.dirname(__file__))
-        self.base = os.path.dirname(os.path.dirname(self.current_path))
-        return self.base + '/account_data_fetcher/netliq.csv'
+        current_path = os.path.realpath(os.path.dirname(__file__))
+        base = os.path.dirname(os.path.dirname(current_path))
+        return base + '/account_data_fetcher/netliq.csv', base + '/account_data_fetcher/deposits_and_withdraws.csv'
         
-    def construct_twr(self, start_date: str ='01/01/2023', exchange: Optional[str] = None):
+    def construct_twr(self, start_date: str ='01/03/2023', exchange: Optional[str] = None):
+        self.row_cache = pd.DataFrame()
         start_date = datetime.strptime(start_date, '%d/%m/%Y')
 
-        netliq_file = self.parent_path+'/netliq.csv'
-        transactions_file = self.parent_path+'/deposits_and_withdraws.csv'
-
-        netliq_data = pd.read_csv(netliq_file)
+        netliq_data = pd.read_csv(self.netliq_path)
         netliq_data['date'] = pd.to_datetime(netliq_data['date'])
-        transactions_data = pd.read_csv(transactions_file)
+        transactions_data = pd.read_csv(self.transactions_path)
         transactions_data['date'] = pd.to_datetime(transactions_data['date'], format='%d/%m/%Y')
+        netliq_data['date'] = pd.to_datetime(netliq_data['date'].dt.strftime('%d/%m/%Y'), format = '%d/%m/%Y')
 
         if exchange is not None:
             netliq_data['netliq'] = netliq_data[exchange.lower()]
-            transactions_data = transactions_data[(transactions_data['from_exchange'] == exchange.upper()) | (transactions_data['to_exchange'] == exchange.upper())]
+            net_transactions = self.get_transaction_data_per_exchange(exchange.upper(), transactions_data)
         else:
-            netliq_data['netliq'] = netliq_data['netliq']
+            net_transactions = self.get_transaction_data_portfolio(transactions_data)
+
+        netliq_data.set_index('date', inplace=True)
+
+        merged_data = pd.merge(netliq_data[["netliq"]], net_transactions, left_index=True, right_index=True, how='left', sort=True)
         
-        netliq_data = netliq_data[netliq_data['date'] >= start_date]
-        transactions_data = transactions_data[transactions_data['date'] >= start_date]
-
-        merged_data = pd.merge(netliq_data, transactions_data, on='date', how='outer').sort_values('date')
-
-        merged_data['netliq'] = merged_data['netliq'].fillna(method='ffill')
-
-        merged_data['net_cash_flow'] = merged_data.apply(
-            lambda row: row['amount'] if (row['to_exchange'] == exchange or row['from_exchange'] == exchange) else 0, axis=1
-        )
-
-        merged_data['net_cash_flow'] = merged_data['net_cash_flow'].fillna(0)
-
-        merged_data['net_transaction'] = merged_data.apply(lambda row: row['amount'] if pd.isna(row['from_exchange']) or pd.isna(row['to_exchange']) else 0, axis=1)
-
-        merged_data['amount'] = merged_data['amount'].fillna(0)
-
-        merged_data['net_transaction'] = merged_data['net_transaction'].fillna(0)
+        merged_data = merged_data[netliq_data.index >= start_date]
+        merged_data.fillna(0, inplace=True)
         
         if exchange is not None:
-            merged_data['daily_return'] = (merged_data['netliq']) / (merged_data['netliq'].shift(1) + merged_data['net_cash_flow'].shift(1)) - 1
-            filtered_data = merged_data[(merged_data['net_cash_flow'].notnull())]
+            merged_data['daily_return'] = [self.compute_daily_returns(row) for _, row in merged_data.iterrows()]
         else:
-            merged_data['daily_return'] = merged_data['netliq'] / (merged_data['netliq'].shift(1) + merged_data['net_transaction'].shift(1)) - 1
-            filtered_data = merged_data[(merged_data['net_transaction'].notnull()) | (merged_data['from_exchange'].isna() or merged_data['to_exchange'].isna())]
+            merged_data['daily_return'] = (merged_data['netliq'] / (merged_data['netliq'].shift(1) + merged_data['net_amount'])) - 1
 
-        print(merged_data[['date', 'netliq', 'daily_return', 'from_exchange', 'to_exchange', 'amount']].tail(30))
+        merged_data['daily_twr'] = ((1 + merged_data['daily_return']).cumprod() - 1 ) * 100
 
-        filtered_data['daily_twr'] = ((1 + filtered_data['daily_return']).cumprod() - 1 ) * 100
+        return merged_data
 
-        daily_twr_data = filtered_data[['date', 'daily_twr']]
+    def get_transaction_data_per_exchange(self, exchange, transactions_data) -> pd.DataFrame:
+        transactions_data = transactions_data[(transactions_data['from_exchange'] == exchange.upper()) | (transactions_data['to_exchange'] == exchange.upper())]
+        transactions_data['exchange'] = transactions_data.apply(
+            lambda row: row['to_exchange'] if row["to_exchange"] == exchange else row['from_exchange'], axis=1
+            )
 
-        return daily_twr_data
+        transactions_data['net_amount'] = transactions_data.apply(
+                lambda row: abs(row['amount']) if row['to_exchange'] == exchange else row['amount'], axis=1
+            )
+
+        net_transactions = transactions_data.groupby(['date', 'exchange'])['net_amount'].sum().reset_index()
+
+        net_transactions.set_index('date', inplace=True)
+
+        return net_transactions
+
+    def get_transaction_data_portfolio(self, transactions_data) -> pd.DataFrame:
+        transactions_data.fillna(0, inplace=True)
+        transactions_data = transactions_data[(transactions_data['from_exchange'] == 0) | (transactions_data['to_exchange'] == 0)]
+
+        transactions_data.rename(columns={'amount': 'net_amount'}, inplace=True)
+        net_transactions = transactions_data.groupby(['date'])['net_amount'].sum().reset_index()
+
+        net_transactions.set_index('date', inplace=True)
+
+        return net_transactions
+
+    def compute_daily_returns(self, row) -> float:
+        if self.row_cache.empty:
+            self.row_cache = row
+
+        #case where netliq exists but was just populated by a deposit!
+        if row["netliq"] > 0 and self.row_cache["netliq"] == 0 and row["net_amount"] > 0:
+            daily_returns = (row["netliq"]/(abs(row["net_amount"])) - 1)
+            
+        #case where netliq doesn't exit anymore as was just withdrwawn
+        elif row["netliq"] < 100 and row["net_amount"] != 0 :
+            daily_returns = (abs(row["net_amount"]) / self.row_cache["netliq"]) - 1
+
+        #case where both netliq and net amount don't exist, exchange was just left
+        elif row["netliq"] < 100 and row["net_amount"] == 0 :
+            daily_returns = 0.0
+            
+        else:
+            daily_returns = (row["netliq"] /( self.row_cache["netliq"] + row["net_amount"])) - 1
+        
+        self.row_cache = row
+
+        return daily_returns
 
     def plot_2d(self, date: str, data) -> None:
         plt.plot(date, data)
@@ -75,6 +108,6 @@ class returnStudy:
 
 if __name__ == '__main__':
     executor = returnStudy()
-    daily_twr_data = executor.construct_twr(exchange="kraken")
+    daily_twr_data = executor.construct_twr(exchange=None)
 
-    # executor.plot_2d(daily_twr_data['date'], daily_twr_data['daily_twr'])
+    executor.plot_2d(daily_twr_data.index, daily_twr_data['daily_twr'])
