@@ -40,10 +40,9 @@ class priceMetaData:
 class rootStockDataFetcher(accountFetcherBase):
     __URL = "https://public-node.rsk.co"
     __ADDRESS_BY_COIN = {"SOV":"0xEfC78FC7D48B64958315949279bA181C2114abbD"}
-    __DECIMAL_BY_COIN = {"SOV": 18}
+    __DECIMAL_BY_COIN = {"SOV": 18, "BTC": 18}
 
     def __init__(self, path: str, password: str, delta_in_seconds_allowed: int = 30) -> None:
-        parent_path = os.path.dirname(path)
         super().__init__(path, password)
         self.logger = logging.getLogger(__name__) 
         self.price_meta_data: Optional[priceMetaData] = None
@@ -98,6 +97,8 @@ class rootStockDataFetcher(accountFetcherBase):
             
         balance_by_coin: dict[str, float] = {}
 
+        balance_by_coin["BTC"] = self.__get_btc_balances()
+
         for coin, contract in self.contract_by_coin.items():
             for my_address in self.address_of_interest: 
                     result = contract.functions.balanceOf(Web3.toChecksumAddress(my_address)).call()
@@ -107,6 +108,14 @@ class rootStockDataFetcher(accountFetcherBase):
                         balance_by_coin[coin.upper()] = int(result) / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
 
         return balance_by_coin
+
+    def __get_btc_balances(self) -> dict:
+        balance: float = 0
+        
+        for my_address in self.address_of_interest:
+            balance +=  self.w3.eth.get_balance(Web3.toChecksumAddress(my_address)) / (10 ** self.__DECIMAL_BY_COIN["BTC"])
+
+        return balance
     
     def get_positions(self, get_price_from_coingecko: Callable) -> dict:
         balance_by_coin = self.get_token_balances_by_coin()
@@ -154,8 +163,6 @@ class rootStockDataFetcher(accountFetcherBase):
         )
 
 
-
-
 if __name__ == '__main__':
     from getpass import getpass
     from account_data_fetcher.offchain.coingecko_data_fetcher import coingeckoDataFetcher
@@ -165,13 +172,14 @@ if __name__ == '__main__':
     logger: logging.Logger = logging.getLogger()
     pwd = getpass("provide password for pk:")
     current_path = os.path.realpath(os.path.dirname(__file__))
+    parent_path = os.path.dirname(current_path)
     price_fetcher = coingeckoDataFetcher().get_prices
-    executor = rootStockDataFetcher(current_path, pwd)
+    executor = rootStockDataFetcher(parent_path, pwd)
     # print(executor.get_token_balances_by_coin())
     # print(executor.get_token_balances_by_coin_single_calls())
     # balance = executor.get_netliq(price_fetcher)
     # print(f"{balance=}")
-    balances = executor.get_position(price_fetcher)
+    balances = executor.get_token_balances_by_coin(price_fetcher)
     print(f"{balances=}")
     # print(len(calls))
     # print(len(addresses))
