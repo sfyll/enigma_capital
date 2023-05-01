@@ -710,7 +710,7 @@ class tradesStationDataFetcher(accountFetcherBase):
             args=params,
             headers=self.headers()
         )
-        if response['Wallets']:
+        if response:
             for wallet in response["Wallets"]:
                 if "USD" in wallet["Currency"] == "USDC":
                     self.account_meta_data[wallet["AccountID"]].CashBalance += float(wallet["Balance"])
