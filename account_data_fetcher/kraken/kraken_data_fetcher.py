@@ -2,11 +2,11 @@ import dataclasses
 from datetime import datetime, timedelta
 import logging
 import os
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from account_data_fetcher.kraken.kraken_connector import krakenApiConnector
-
-from utilities.account_data_fetcher_base import accountFetcherBase
+from account_data_fetcher.exchange_base.exchange_base import ExchangeBase
+from infrastructure.api_secret_getter import ApiMetaData
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class balanceMetaData:
@@ -50,7 +50,7 @@ class balanceMetaData:
 
         return data_to_return
 
-class krakenDataFetcher(accountFetcherBase):
+class krakenDataFetcher(ExchangeBase):
     _EXCHANGE = "Kraken"
     _ENDPOINT = 'https://api.kraken.com'
     __KRAKEN_TICKER_TO_OTHERS = {
@@ -77,15 +77,15 @@ class krakenDataFetcher(accountFetcherBase):
         "XXBT":"XBTC",
     }
     __NO_PRICE_MAP = ["ZGBP", "ZEUR"]
-    def __init__(self, path: str, password: str, sub_account_name: str = None) -> None:
-        super().__init__(path, password)
+    def __init__(self, path: str, password: str, port_number: int, sub_account_name: Optional[str] = None) -> None:
+        super().__init__(port_number, self._EXCHANGE)
+        secrets: ApiMetaData = self.get_secrets(path, password, self._EXCHANGE)
         self.logger = logging.getLogger(__name__) 
         self._subaccount_name = sub_account_name
-        self.kraken_connector = krakenApiConnector(api_key=self.api_meta_data[self._EXCHANGE].key, api_secret=self.api_meta_data[self._EXCHANGE].secret)
+        self.kraken_connector = krakenApiConnector(api_key=secrets.key, api_secret=secrets.secret)
         self.balance_meta_data: Optional[balanceMetaData] = None
 
-
-    def get_netliq(self, accountType: str = "SPOT") -> float:
+    def fetch_balance(self, accountType: str = "SPOT") -> float:
         self.__update_balances(accountType)
         return self.balance_meta_data.get_netliq()
     
@@ -110,7 +110,7 @@ class krakenDataFetcher(accountFetcherBase):
             balance_per_coin_in_dollars=balance_per_coin_dollar
         )
         
-    def get_balance_per_ticker_in_dollars(self, balances: dict) -> dict:
+    def get_positions(self, balances: dict) -> dict:
         dollar_balances: dict = {}
         prices: dict = self.kraken_connector.get_ticker()
 

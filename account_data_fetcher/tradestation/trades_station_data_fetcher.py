@@ -9,9 +9,10 @@ import pgpy
 import requests
 import urllib.parse
 
-from utilities.account_data_fetcher_base import accountFetcherBase
 from utilities.encryptor import get_decrypted_ts_state, encrypt_and_write_ts_to_file
 
+from account_data_fetcher.exchange_base.exchange_base import ExchangeBase
+from infrastructure.api_secret_getter import ApiMetaData
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class AccountMetaData:
@@ -24,7 +25,7 @@ class AccountMetaData:
     UnclearedDeposit: float
 
 """https://github.com/areed1192/tradestation-python-api/blob/master/ts/client.py"""
-class tradesStationDataFetcher(accountFetcherBase):
+class tradesStationDataFetcher(ExchangeBase):
     __AUTH_ENDPOINT = "https://signin.tradestation.com/oauth/token"
     __REDIRECT_URI = "http://localhost:3000/"
     __RESOURCE = "https://api.tradestation.com"
@@ -32,13 +33,14 @@ class tradesStationDataFetcher(accountFetcherBase):
     __API_VERSION = "v3"
     __PAPER_RESOURCE = "https://sim-api.tradestation.com"
 
-    def __init__(self, path: str, password: str, paper_trading = False,
+    def __init__(self, path: str, password: str, port_number: int,  paper_trading = False,
                 cache_state = True, refresh_enabled = True) -> None:
-        super().__init__(path, password)
+        super().__init__(port_number, self.__EXCHANGE)
+        secrets: ApiMetaData = self.get_secrets(path, password, self.__EXCHANGE)
         self.config = {
-            'client_id': self.api_meta_data[self.__EXCHANGE].key,
-            'client_secret': self.api_meta_data[self.__EXCHANGE].secret,
-            'username': self.api_meta_data[self.__EXCHANGE].other_fields["Username"],
+            'client_id':secrets.key,
+            'client_secret': secrets.secret,
+            'username': secrets.other_fields["Username"],
             'redirect_uri': self.__REDIRECT_URI,
             'resource': self.__RESOURCE,
             'paper_resource': self.__PAPER_RESOURCE,
@@ -720,7 +722,7 @@ class tradesStationDataFetcher(accountFetcherBase):
 
         return response
 
-    def get_sum_of_balance(self) -> int:
+    def fetch_balance(self) -> int:
         self.account_balances()
         self.account_wallets()
         account_total_balance: float = 0.0
@@ -808,7 +810,7 @@ class tradesStationDataFetcher(accountFetcherBase):
 
         return response
 
-    def get_formated_positions(self):
+    def fetch_positions(self):
 
         positions: dict = self.account_positions()
 

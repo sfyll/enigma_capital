@@ -8,7 +8,8 @@ from typing import Callable, Dict, List, Optional
 from web3 import Web3
 
 from account_data_fetcher.onchain.config import *
-from utilities.account_data_fetcher_base import accountFetcherBase
+from account_data_fetcher.exchange_base.exchange_base import ExchangeBase
+from account_data_fetcher.coingecko.coingecko_data_fetcher  import coingeckoDataFetcher 
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class balanceMetaData:
@@ -37,13 +38,14 @@ class priceMetaData:
                 
             return delta.total_seconds() < delta_in_seconds_allowed
 
-class rootStockDataFetcher(accountFetcherBase):
+class rootStockDataFetcher(ExchangeBase):
     __URL = "https://public-node.rsk.co"
     __ADDRESS_BY_COIN = {"SOV":"0xEfC78FC7D48B64958315949279bA181C2114abbD"}
     __DECIMAL_BY_COIN = {"SOV": 18, "BTC": 18}
+    __EXCHANGE = "Rsk"
 
-    def __init__(self, path: str, password: str, delta_in_seconds_allowed: int = 30) -> None:
-        super().__init__(path, password)
+    def __init__(self, path: str, password: str, port_number: int, delta_in_seconds_allowed: int = 30) -> None:
+        super().__init__(port_number, self.__EXCHANGE)
         self.logger = logging.getLogger(__name__) 
         self.price_meta_data: Optional[priceMetaData] = None
         self.balance_meta_data: Optional[balanceMetaData] = None
@@ -51,6 +53,7 @@ class rootStockDataFetcher(accountFetcherBase):
         self.contract_by_coin: dict = self.__get_contract_by_coin()
         self.address_of_interest: list = self.__get_address_of_interest(path)
         self.delta_in_seconds_allowed: int = delta_in_seconds_allowed
+        self.price_fetcher: coingeckoDataFetcher = coingeckoDataFetcher()
 
     def __get_contract_by_coin(self) -> dict:
         contract_by_coin: dict = {}
@@ -72,14 +75,14 @@ class rootStockDataFetcher(accountFetcherBase):
             return json.load(f)['addresses_per_chain']["RSK"]
             
 
-    def get_netliq(self, get_price_from_coingecko: Callable) -> float:
+    def get_netliq(self) -> float:
         balance_by_coin: dict = self.get_token_balances_by_coin()
 
         self.logger.debug(f"{balance_by_coin=}")
         
         netliq: float = 0
         
-        self.get_prices_for_coins(balance_by_coin, get_price_from_coingecko)
+        self.get_prices_for_coins(balance_by_coin)
         
         for coin, balance in balance_by_coin.items():
             if "USD" in coin:
@@ -117,7 +120,7 @@ class rootStockDataFetcher(accountFetcherBase):
 
         return balance
     
-    def get_positions(self, get_price_from_coingecko: Callable) -> dict:
+    def get_positions(self) -> dict:
         balance_by_coin = self.get_token_balances_by_coin()
 
         data_to_return = {
@@ -128,7 +131,7 @@ class rootStockDataFetcher(accountFetcherBase):
         } 
 
 
-        self.get_prices_for_coins(balance_by_coin, get_price_from_coingecko)
+        self.get_prices_for_coins(balance_by_coin)
 
         for coin, balance in balance_by_coin.items():
             if "USD" in coin:
@@ -145,7 +148,7 @@ class rootStockDataFetcher(accountFetcherBase):
         
         return data_to_return
 
-    def get_prices_for_coins(self, balance_by_coin: Dict[str, float], get_prices_from_coingecko: Callable) -> None:
+    def get_prices_for_coins(self, balance_by_coin: Dict[str, float]) -> None:
         if self.price_meta_data:
             if self.price_meta_data.is_acceptable_timestamp_detla(self.delta_in_seconds_allowed):
                 return self.price_meta_data.prices_per_coin
@@ -153,7 +156,7 @@ class rootStockDataFetcher(accountFetcherBase):
         #fetching all but stablecoins usd denominated
         coins_to_fetch_price_for: List[str] = [coin for coin, _ in balance_by_coin.items() if "USD" not in coin]
 
-        price_per_coin = get_prices_from_coingecko(coins_to_fetch_price_for)
+        price_per_coin = self.price_fetcher.get_prices(coins_to_fetch_price_for)
 
         dt = datetime.utcnow()
 

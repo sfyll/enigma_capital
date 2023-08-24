@@ -9,25 +9,26 @@ from ibflex import client
 from ibflex.Types import OpenPosition, FlexQueryResponse, FlexStatement
 from ibflex.client import ResponseCodeError
 
-from utilities.account_data_fetcher_base import accountFetcherBase
+from account_data_fetcher.exchange_base.exchange_base import ExchangeBase
+from infrastructure.api_secret_getter import ApiMetaData
 
-
-class ibDataFetcher(accountFetcherBase):
+class ibDataFetcher(ExchangeBase):
     __HOURS_DIFFERENCE_FROM_UTC = -5
     __EXCHANGE= "IB"
 
-    def __init__(self, path, password) -> None:
-        super().__init__(path, password)
-        self.__get_account_and_query_ids()
+    def __init__(self, path: str, password: str, port_number: int) -> None:
+        super().__init__(port_number, self.__EXCHANGE)
+        secrets: ApiMetaData = self.get_secrets(path, password, self.__EXCHANGE)
+        self.__get_account_and_query_ids(secrets)
         self.logger = logging.getLogger(__name__)
         self.balance_object: Optional[FlexStatement] = None
         self.positions_object: Optional[FlexStatement] = None
 
-    def __get_account_and_query_ids(self) -> None:
+    def __get_account_and_query_ids(self, secrets: ApiMetaData) -> None:
         self.account_and_query_ids: dict = {
-            "token" : self.api_meta_data[self.__EXCHANGE].other_fields["Token"],
-            "query_id_balance" : self.api_meta_data[self.__EXCHANGE].other_fields["Balance_query_id"],
-            "query_id_position" : self.api_meta_data[self.__EXCHANGE].other_fields["Position_query_id"]
+            "token" : secrets.other_fields["Token"],
+            "query_id_balance" : secrets.other_fields["Balance_query_id"],
+            "query_id_position" : secrets.other_fields["Position_query_id"]
         }
 
     def update_balance_and_get_ib_datetime(self) -> datetime:
@@ -40,12 +41,12 @@ class ibDataFetcher(accountFetcherBase):
             self.get_positions_object()
         return self.positions_object.whenGenerated
 
-    def get_netliq(self) -> float:
+    def fetch_balance(self, accountType = None) -> float:
         if not self.is_acceptable_timestamp_detla(self.balance_object, "BALANCE"):
             self.get_balance_object()
         return round(float(self.balance_object.ChangeInNAV.endingValue),3)
 
-    def get_positions(self) -> dict:
+    def fetch_positions(self, accountType = None) -> dict:
         if not self.is_acceptable_timestamp_detla(self.positions_object, "POSITIONS"):
             self.get_positions_object()
         #denominate in usd so multiply by FXRateToBase, get columns: Symbol, Multiplier, Quantity, MarkPrice, CostBasisPrice, FifoPnlUnrealized

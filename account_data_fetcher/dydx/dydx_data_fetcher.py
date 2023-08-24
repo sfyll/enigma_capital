@@ -9,7 +9,7 @@ from dependencies.dydxv3python.dydx3.constants import API_HOST_MAINNET
 from dependencies.dydxv3python.dydx3.constants import NETWORK_ID_MAINNET
 
 from account_data_fetcher.exchange_base.exchange_base import ExchangeBase
-from utilities.api_secret_getter import ApiMetaData
+from infrastructure.api_secret_getter import ApiMetaData
 
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
@@ -66,7 +66,8 @@ class marginRequirements:
 
 class dydxDataFetcher(ExchangeBase):
     _EXCHANGE = "DYDX"
-    def __init__(self, path: str, password: str) -> None:
+    def __init__(self, path: str, password: str, port_number: int) -> None:
+        super().__init__(port_number, self._EXCHANGE)
         secrets: ApiMetaData = self.get_secrets(path, password, self._EXCHANGE)
         self.logger = logging.getLogger(__name__) 
         self.client = Client(

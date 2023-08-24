@@ -1,23 +1,25 @@
 import logging
 import os
-from typing import List
+from typing import List, Optional
 
 from account_data_fetcher.bybit.bybit_connector import bybitApiConnector
 from account_data_fetcher.bybit.exception import FailedRequestError, InvalidRequestError
 
-from utilities.account_data_fetcher_base import accountFetcherBase
+from account_data_fetcher.exchange_base.exchange_base import ExchangeBase
+from infrastructure.api_secret_getter import ApiMetaData
 
 #TODO make a config object to be parsed so that we can modify which account type to fetch
-class bybitDataFetcher(accountFetcherBase):
+class bybitDataFetcher(ExchangeBase):
     _EXCHANGE = "BYBIT"
     _ENDPOINT = 'https://api.bybit.com'
-    def __init__(self, path: str, password: str, sub_account_name: str = None) -> None:
-        super().__init__(path, password)
+    def __init__(self, path: str, password: str, port_number: int, sub_account_name: Optional[str] = None) -> None:
+        super().__init__(port_number, self._EXCHANGE)
+        secrets: ApiMetaData = self.get_secrets(path, password, self._EXCHANGE)
         self.logger = logging.getLogger(__name__) 
         self._subaccount_name = sub_account_name
-        self.bybit_connector = bybitApiConnector(api_key=self.api_meta_data[self._EXCHANGE].key, api_secret=self.api_meta_data[self._EXCHANGE].secret)
-
-    def get_netliq(self, accountType="UNIFIED") -> float:
+        self.bybit_connector = bybitApiConnector(api_key=secrets.key, api_secret=secrets.secret)
+    
+    def fetch_balance(self, accountType="UNIFIED") -> float:
         netliq = self.__get_balances(accountType)
         return round(netliq, 2)
     
@@ -57,7 +59,7 @@ class bybitDataFetcher(accountFetcherBase):
 
             return round(spot_netliq + derivative_balance)
 
-    def get_positions(self, market: str) -> dict:
+    def fetch_positions(self, market: str) -> dict:
         if market == "SPOT":
             return self.__get_spot_positions()
         elif market == "FUTURE":
