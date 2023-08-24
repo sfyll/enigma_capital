@@ -1,4 +1,5 @@
 import logging
+import os
 
 def args_handler(args):    
     # Setup logging
@@ -18,7 +19,7 @@ def args_handler(args):
 
 def create_exchange_specific_logger(exchange_name: str) -> logging.Logger:
     logger = logging.getLogger(exchange_name)
-    log_filename = f"{exchange_name}_log.txt"
+    log_filename = os.path.expanduser(f"~/log/{exchange_name}_log.txt")
     
     if not logger.handlers:
         file_handler = logging.FileHandler(log_filename)
