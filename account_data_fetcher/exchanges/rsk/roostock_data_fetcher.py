@@ -7,9 +7,9 @@ from typing import Callable, Dict, List, Optional
 
 from web3 import Web3
 
-from account_data_fetcher.onchain.config import *
-from account_data_fetcher.exchange_base.exchange_base import ExchangeBase
-from account_data_fetcher.coingecko.coingecko_data_fetcher  import coingeckoDataFetcher 
+from config.onchain_config import *
+from account_data_fetcher.exchanges.exchange_base import ExchangeBase
+from exchanges.coingecko.data_fetcher import DataFetcher as coingeckoDataFetcher
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class balanceMetaData:
@@ -38,13 +38,13 @@ class priceMetaData:
                 
             return delta.total_seconds() < delta_in_seconds_allowed
 
-class rootStockDataFetcher(ExchangeBase):
+class DataFetcher(ExchangeBase):
     __URL = "https://public-node.rsk.co"
     __ADDRESS_BY_COIN = {"SOV":"0xEfC78FC7D48B64958315949279bA181C2114abbD"}
     __DECIMAL_BY_COIN = {"SOV": 18, "BTC": 18}
     __EXCHANGE = "Rsk"
 
-    def __init__(self, path: str, password: str, port_number: int, delta_in_seconds_allowed: int = 30) -> None:
+    def __init__(self, port_number: int, delta_in_seconds_allowed: int = 30) -> None:
         super().__init__(port_number, self.__EXCHANGE)
         self.logger = logging.getLogger(__name__) 
         self.price_meta_data: Optional[priceMetaData] = None
@@ -63,13 +63,14 @@ class rootStockDataFetcher(ExchangeBase):
         
         return contract_by_coin
 
-    def __get_address_of_interest(self, path: str) -> list:
+    def __get_address_of_interest(self) -> list:
         """
         FORMAT OF meta_data.json:
         {"addresses_per_chain": {"Ethereum":[]}
         """
-
-        path = path + "/onchain/meta_data.json"
+        
+        current_directory = os.path.dirname(__file__)
+        path = os.path.abspath(os.path.join(current_directory, '..', '..', 'config', 'onchain_meta_data.json'))
 
         with open(path, "r") as f:
             return json.load(f)['addresses_per_chain']["RSK"]

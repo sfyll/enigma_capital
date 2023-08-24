@@ -5,14 +5,15 @@ import os
 from requests import Request, Session, Response
 import urllib.parse
 
-from utilities.account_data_fetcher_base import accountFetcherBase
+from account_data_fetcher.exchanges.exchange_base import ExchangeBase
+from infrastructure.api_secret_getter import ApiMetaData
 
 
-class ftxDataFetcher(accountFetcherBase):
+class DataFetcher(ExchangeBase):
     _EXCHANGE = "FTX"
     _ENDPOINT = 'https://ftx.com/api/'
-    def __init__(self, path: str, password: str, sub_account_name: str = None) -> None:
-        super().__init__(path, password)
+    def __init__(self, port_number: int, sub_account_name: str = None) -> None:
+        super().__init__(port_number, self._EXCHANGE)
         self._session = Session()
         self._subaccount_name = sub_account_name
 

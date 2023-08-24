@@ -4,8 +4,8 @@ import logging
 import os
 from typing import Dict, Optional
 
-from account_data_fetcher.kraken.kraken_connector import krakenApiConnector
-from account_data_fetcher.exchange_base.exchange_base import ExchangeBase
+from exchanges.kraken.kraken_connector import krakenApiConnector
+from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
@@ -50,7 +50,7 @@ class balanceMetaData:
 
         return data_to_return
 
-class krakenDataFetcher(ExchangeBase):
+class DataFetcher(ExchangeBase):
     _EXCHANGE = "Kraken"
     _ENDPOINT = 'https://api.kraken.com'
     __KRAKEN_TICKER_TO_OTHERS = {
@@ -77,9 +77,8 @@ class krakenDataFetcher(ExchangeBase):
         "XXBT":"XBTC",
     }
     __NO_PRICE_MAP = ["ZGBP", "ZEUR"]
-    def __init__(self, path: str, password: str, port_number: int, sub_account_name: Optional[str] = None) -> None:
+    def __init__(self, secrets: ApiMetaData, port_number: int, sub_account_name: Optional[str] = None) -> None:
         super().__init__(port_number, self._EXCHANGE)
-        secrets: ApiMetaData = self.get_secrets(path, password, self._EXCHANGE)
         self.logger = logging.getLogger(__name__) 
         self._subaccount_name = sub_account_name
         self.kraken_connector = krakenApiConnector(api_key=secrets.key, api_secret=secrets.secret)

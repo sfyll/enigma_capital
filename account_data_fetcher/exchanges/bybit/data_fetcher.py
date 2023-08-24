@@ -2,20 +2,18 @@ import logging
 import os
 from typing import List, Optional
 
-from account_data_fetcher.bybit.bybit_connector import bybitApiConnector
-from account_data_fetcher.bybit.exception import FailedRequestError, InvalidRequestError
+from exchanges.bybit.bybit_connector import bybitApiConnector
+from exchanges.bybit.exception import FailedRequestError, InvalidRequestError
 
-from account_data_fetcher.exchange_base.exchange_base import ExchangeBase
+from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
 
 #TODO make a config object to be parsed so that we can modify which account type to fetch
-class bybitDataFetcher(ExchangeBase):
+class DataFetcher(ExchangeBase):
     _EXCHANGE = "BYBIT"
     _ENDPOINT = 'https://api.bybit.com'
-    def __init__(self, path: str, password: str, port_number: int, sub_account_name: Optional[str] = None) -> None:
+    def __init__(self, secrets: ApiMetaData, port_number: int, sub_account_name: Optional[str] = None) -> None:
         super().__init__(port_number, self._EXCHANGE)
-        secrets: ApiMetaData = self.get_secrets(path, password, self._EXCHANGE)
-        self.logger = logging.getLogger(__name__) 
         self._subaccount_name = sub_account_name
         self.bybit_connector = bybitApiConnector(api_key=secrets.key, api_secret=secrets.secret)
     

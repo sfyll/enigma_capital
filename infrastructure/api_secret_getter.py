@@ -18,7 +18,7 @@ class ApiSecretGetter:
         pass    
 
     @staticmethod
-    def get_api_meta_data(path: str, pwd: str, api_to_get: str) -> ApiMetaData:
+    def get_api_meta_data(path: str, pwd: str) -> ApiMetaData:
         api_meta_data: dict = {}
         try:
             key = encryptor.get_key_from_current_file(path)
@@ -34,7 +34,7 @@ class ApiSecretGetter:
                     secret=meta_data_dict[key]["Secret"],
                     other_fields=meta_data_dict[key]["Other_fields"] if "Other_fields" in meta_data_dict[key] else None
                 )
-        return api_meta_data[api_to_get]
+        return api_meta_data
 
     @staticmethod
     def get_gsheet_meta_data(path: str, pwd: str) -> dict:

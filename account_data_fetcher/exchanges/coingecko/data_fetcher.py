@@ -6,7 +6,7 @@ from requests.exceptions import HTTPError
 
 from utilities.request_handler import requestHandler
 
-class coingeckoDataFetcher:
+class DataFetcher:
     __API_ENDPOINT = "https://api.coingecko.com/api/v3/"
     def __init__(self, include_platform: str = "false") -> None:
         self.logger = logging.getLogger(__name__) 

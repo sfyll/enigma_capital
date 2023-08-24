@@ -9,16 +9,15 @@ from ibflex import client
 from ibflex.Types import OpenPosition, FlexQueryResponse, FlexStatement
 from ibflex.client import ResponseCodeError
 
-from account_data_fetcher.exchange_base.exchange_base import ExchangeBase
+from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
 
-class ibDataFetcher(ExchangeBase):
+class DataFetcher(ExchangeBase):
     __HOURS_DIFFERENCE_FROM_UTC = -5
     __EXCHANGE= "IB"
 
-    def __init__(self, path: str, password: str, port_number: int) -> None:
+    def __init__(self, secrets: ApiMetaData, port_number: int) -> None:
         super().__init__(port_number, self.__EXCHANGE)
-        secrets: ApiMetaData = self.get_secrets(path, password, self.__EXCHANGE)
         self.__get_account_and_query_ids(secrets)
         self.logger = logging.getLogger(__name__)
         self.balance_object: Optional[FlexStatement] = None

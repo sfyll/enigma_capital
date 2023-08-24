@@ -1,6 +1,5 @@
 import datetime
 from datetime import timedelta
-import csv
 import logging
 import os
 from os import listdir
@@ -12,17 +11,15 @@ import pandas as pd
 from pandas import DataFrame
 from binance.spot import Spot
 
-from account_data_fetcher.exchange_base.exchange_base import ExchangeBase
+from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
 
 
-class binanceDataFetcher(ExchangeBase):
+class DataFetcher(ExchangeBase):
     _EXCHANGE = "Binance"
     _ENDPOINT = 'https://api.binance.com'
-    def __init__(self, path: str, password: str, port_number: int, sub_account_name: Optional[str] = None) -> None:
+    def __init__(self, secrets: ApiMetaData, port_number: int, sub_account_name: Optional[str] = None) -> None:
         super().__init__(port_number, self._EXCHANGE)
-        secrets: ApiMetaData = self.get_secrets(path, password, self._EXCHANGE)
-        self.logger = logging.getLogger(__name__) 
         self._subaccount_name = sub_account_name
         self._client = Spot(key=secrets.key, secret=secrets.secret)
 

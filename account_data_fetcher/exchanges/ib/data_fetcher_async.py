@@ -3,17 +3,16 @@ from typing import Optional
 
 from ib_insync import *
 
-from utilities.account_data_fetcher_base import accountFetcherBase
+from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 
-
-class InteractiveBrokersAppAsync(accountFetcherBase):
+class DataFetcher(ExchangeBase):
     __EXCHANGE = "IB"
     __GATEWAY_V = "10.20"
     __GATEWAY_PORT = 4001
     __TWS_PORT = 7496
     __HOST = "127.0.0.1"
-    def __init__(self, path: str, password: str, app: str = "GATEWAY"):
-        super().__init__(path, password)
+    def __init__(self, port_number: int, app: str = "GATEWAY"):
+        super().__init__(port_number, self.__EXCHANGE)
         self.logger = logging.getLogger(__name__)
         self.__on_start(app)
         self.netliq: Optional[float] = None

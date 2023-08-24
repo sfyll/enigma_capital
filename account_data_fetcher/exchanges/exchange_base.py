@@ -1,17 +1,18 @@
 from abc import ABC, abstractmethod
 import json
+import logging
 from typing import Optional
 
+from setproctitle import setproctitle
 import zmq
 
-from utilities.api_secret_getter import ApiSecretGetter, ApiMetaData
+from infrastructure.log_handler import create_exchange_specific_logger
 
 class ExchangeBase(ABC):
-    def __init__(self, port_number: int) -> None:
+    def __init__(self, port_number: int, exchange: str) -> None:
+        setproctitle(exchange)
         self.port_number = port_number
-
-    def get_secrets(self, path: str, password: str, api_to_get: str) -> ApiMetaData:
-        return ApiSecretGetter.get_api_meta_data(path, password, api_to_get)
+        self.logger = create_exchange_specific_logger(exchange)
     
     @abstractmethod
     def fetch_balance(self, accountType: Optional[str] = None):
