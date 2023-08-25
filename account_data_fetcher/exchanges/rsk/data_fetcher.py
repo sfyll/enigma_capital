@@ -51,7 +51,7 @@ class DataFetcher(ExchangeBase):
         self.balance_meta_data: Optional[balanceMetaData] = None
         self.w3 = Web3(Web3.HTTPProvider(self.__URL))
         self.contract_by_coin: dict = self.__get_contract_by_coin()
-        self.address_of_interest: list = self.__get_address_of_interest(path)
+        self.address_of_interest: list = self.__get_address_of_interest()
         self.delta_in_seconds_allowed: int = delta_in_seconds_allowed
         self.price_fetcher: coingeckoDataFetcher = coingeckoDataFetcher()
 
