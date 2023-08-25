@@ -7,9 +7,9 @@ from typing import Callable, Dict, List, Optional
 
 from web3 import Web3
 
-from exchanges.config.onchain_config import *
+from account_data_fetcher.config.onchain_config import *
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
-from exchanges.coingecko.data_fetcher  import DataFetcher 
+from account_data_fetcher.exchanges.coingecko.data_fetcher  import DataFetcher as CoingeckoDataFetcher
 from infrastructure.api_secret_getter import ApiMetaData
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
@@ -42,7 +42,7 @@ class priceMetaData:
 #TODO: Batch calls via multicall contracts + use helios lightweight client (need to fix eth_call loops, broken atm)
 class DataFetcher(ExchangeBase):
     __URL = "https://eth-mainnet.g.alchemy.com/v2/"
-    __EXCHANGE = "Alchemy"
+    __EXCHANGE = "Ethereum"
     __ADDRESS_BY_COIN = {"USDC":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7", "AMPL":"0xD46bA6D942050d489DBd938a2C909A5d5039A161", "DAI": "0x6B175474E89094C44Da98b954EedeAC495271d0F", "DYDX": "0x92D6C1e31e14520e676a687F0a93788B716BEff5"}
     __DECIMAL_BY_COIN = {"USDC": 6, "USDT": 6, "AMPL": 9, "DAI": 18, "DYDX": 18, "ETH": 18}
 
@@ -53,9 +53,9 @@ class DataFetcher(ExchangeBase):
         self.balance_meta_data: Optional[balanceMetaData] = None
         self.w3 = Web3(Web3.HTTPProvider(self.__URL+secrets.key))
         self.contract_by_coin: dict = self.__get_contract_by_coin()
-        self.address_of_interest: list = self.__get_address_of_interest(path)
+        self.address_of_interest: list = self.__get_address_of_interest()
         self.delta_in_seconds_allowed: int = delta_in_seconds_allowed
-        self.price_fetcher: DataFetcher = DataFetcher()
+        self.price_fetcher: CoingeckoDataFetcher = CoingeckoDataFetcher()
 
     def __get_contract_by_coin(self) -> dict:
         contract_by_coin: dict = {}
@@ -69,7 +69,8 @@ class DataFetcher(ExchangeBase):
         """FORMAT OF meta_data.json:
         {"addresses": [] }"""
 
-        path = path + "/onchain/meta_data.json"
+        current_directory = os.path.dirname(__file__)
+        path = os.path.abspath(os.path.join(current_directory, '..', '..', 'config', 'onchain_meta_data.json'))
 
         with open(path, "r") as f:
             return json.load(f)['addresses_per_chain']['Ethereum']
