@@ -196,7 +196,36 @@ class DataFetcher(ExchangeBase):
 
         return round(netliq_in_dollars,3)
 
-    def fetch_positions(self, accountType: str) -> dict:
+    def fetch_positions(self) -> dict:
+
+        data_to_return = {
+        "Symbol": [],
+        "Multiplier": [],
+        "Quantity": [],
+        "Dollar Quantity": []
+        }
+        
+        spot_positions = self.get_spot_positions()
+        future_positions = self.get_margin_positions()
+
+        all_positions = [spot_positions, future_positions]
+
+        # Aggregating positions by symbol
+        for pos in all_positions:
+            for i, symbol in enumerate(pos["Symbol"]):
+                if symbol in data_to_return["Symbol"]:
+                    index = data_to_return["Symbol"].index(symbol)
+                    data_to_return["Quantity"][index] += pos["Quantity"][i]
+                    data_to_return["Dollar Quantity"][index] += pos["Dollar Quantity"][i]
+                else:
+                    data_to_return["Symbol"].append(symbol)
+                    data_to_return["Multiplier"].append(1)
+                    data_to_return["Quantity"].append(pos["Quantity"][i])
+                    data_to_return["Dollar Quantity"].append(pos["Dollar Quantity"][i])
+
+        return data_to_return
+
+    def fetch_specific_positions(self, accountType: str) -> dict:
         if accountType == "SPOT":
            return self.get_spot_positions()
         elif accountType == "MARGIN":

@@ -16,7 +16,7 @@ class DataFetcher(ExchangeBase):
         super().__init__(port_number, self._EXCHANGE)
         self._subaccount_name = sub_account_name
         self.bybit_connector = bybitApiConnector(api_key=secrets.key, api_secret=secrets.secret)
-    
+
     def fetch_balance(self, accountType="UNIFIED") -> float:
         netliq = self.__get_balances(accountType)
         return round(netliq, 2)
@@ -56,8 +56,37 @@ class DataFetcher(ExchangeBase):
                     spot_netliq += coin_balance * self.__get_coin_price(name)
 
             return round(spot_netliq + derivative_balance)
+        
+    def fetch_positions(self) -> dict:
+        data_to_return = {
+        "Symbol": [],
+        "Multiplier": [],
+        "Quantity": [],
+        "Dollar Quantity": []
+        }
+        
+        spot_positions = self.__get_spot_positions()
+        future_positions = self.__get_derivatives_positions()
+        unified_positions = self.__get_unified_positions()
 
-    def fetch_positions(self, market: str) -> dict:
+        all_positions = [spot_positions, future_positions, unified_positions]
+
+        # Aggregating positions by symbol
+        for pos in all_positions:
+            for i, symbol in enumerate(pos["Symbol"]):
+                if symbol in data_to_return["Symbol"]:
+                    index = data_to_return["Symbol"].index(symbol)
+                    data_to_return["Quantity"][index] += pos["Quantity"][i]
+                    data_to_return["Dollar Quantity"][index] += pos["Dollar Quantity"][i]
+                else:
+                    data_to_return["Symbol"].append(symbol)
+                    data_to_return["Multiplier"].append(1)
+                    data_to_return["Quantity"].append(pos["Quantity"][i])
+                    data_to_return["Dollar Quantity"].append(pos["Dollar Quantity"][i])
+
+        return data_to_return
+
+    def fetch_specific_positions(self, market: str) -> dict:
         if market == "SPOT":
             return self.__get_spot_positions()
         elif market == "FUTURE":
