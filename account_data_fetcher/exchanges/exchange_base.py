@@ -8,7 +8,7 @@ import zmq
 
 class ExchangeBase(ABC):
     def __init__(self, port_number: int, exchange: str) -> None:
-        setproctitle(exchange)
+        setproctitle(exchange.lower())
         self.port_number = port_number
         self.logger = logging.getLogger(__name__)
         self.process_request()
