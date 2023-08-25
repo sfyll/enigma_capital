@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Dict, Optional
 
-from exchanges.kraken.kraken_connector import krakenApiConnector
+from account_data_fetcher.exchanges.kraken.kraken_connector import krakenApiConnector
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
 
@@ -109,7 +109,7 @@ class DataFetcher(ExchangeBase):
             balance_per_coin_in_dollars=balance_per_coin_dollar
         )
         
-    def get_positions(self, balances: dict) -> dict:
+    def fetch_positions(self, balances: dict) -> dict:
         dollar_balances: dict = {}
         prices: dict = self.kraken_connector.get_ticker()
 

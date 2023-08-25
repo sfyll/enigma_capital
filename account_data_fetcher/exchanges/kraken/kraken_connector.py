@@ -10,7 +10,7 @@ import time
 import urllib
 from typing import List, Optional
 
-from exchanges.kraken.exception import InvalidRequestError, FailedRequestError
+from account_data_fetcher.exchanges.kraken.exception import InvalidRequestError, FailedRequestError
 from utilities.request_handler import requestHandler
 
 class krakenApiConnector:
