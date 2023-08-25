@@ -93,12 +93,11 @@ class DataFetcher(ExchangeBase):
             else:
                 raise Exception("Kept on getting ConnectionResetErrors")
 
-    def get_balance(self) -> float:
+    def fetch_balance(self) -> float:
         account_info = self.get_account_info()
         return float(account_info["accounts"][0]["equity"])
 
     def fetch_positions(self) -> dict:
-        
         open_positions: Dict[str, openPositions] = {}
         account_info = self.get_account_info()["accounts"][0]
         open_positions_meta_data = account_info["openPositions"]
