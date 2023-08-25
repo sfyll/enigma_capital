@@ -9,9 +9,9 @@ import zmq
 
 class WriterBase(ABC):
     __PROCESS_PREFIX = "write_"
-    def __init__(self, port_number: int, writer: str) -> None:
+    def __init__(self, data_aggregator_port_number: int, writer: str) -> None:
         setproctitle(self.__PROCESS_PREFIX + writer.lower())
-        self.port_number = port_number
+        self.data_aggregator_port_number = data_aggregator_port_number
         self.logger = logging.getLogger(__name__)
         self.process_request()
 
@@ -30,18 +30,14 @@ class WriterBase(ABC):
 
     def process_request(self):
         context = zmq.Context()
-        socket = context.socket(zmq.REP)
-        socket.bind(f"tcp://*:{self.port_number}")
+        socket = context.socket(zmq.SUB)
+        socket.connect(f"tcp://localhost:{self.data_aggregator_port_number}") # Assuming middleman is running on the same host
+        socket.subscribe('balances')
+        socket.subscribe('positions')
 
         while True:
-            request_type = socket.recv_string()
-            response_data: str
-
-            if request_type == 'balance':
-                response_data = str(self.write_balances())
-            elif request_type == 'positions':
-                response_data = json.dumps(self.write_positions())
-            else:
-                response_data = f"Unknown request type: {request_type}"
-
-            socket.send_string(response_data)
+            topic, data = socket.recv_multipart()
+            if topic == b'balances':
+                self.write_balances(json.loads(data))
+            elif topic == b'positions':
+                self.write_positions(json.loads(data))
