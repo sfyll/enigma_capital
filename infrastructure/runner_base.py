@@ -11,13 +11,18 @@ from infrastructure.api_secret_getter import ApiSecretGetter, ApiMetaData
 
 class RunnerBase:
         def __init__(self, logger: Optional[Logger] = None) -> None:
-            self.path = os.path.realpath(os.path.dirname(__file__))
+            self.base_path = self.get_base_path()
             self.logger = logging.getLogger(__name__) if not logger else logger
             self.loop = asyncio.get_event_loop()
             for signame in {'SIGINT', 'SIGTERM'}:
                 self.loop.add_signal_handler(
                 getattr(signal, signame),
                 functools.partial(self.ask_exit, signame, self.loop, self.logger))
+        
+        @staticmethod
+        def get_base_path():
+            current_directory = os.path.dirname(__file__)
+            return os.path.abspath(os.path.join(current_directory, '..'))
             
         @staticmethod
         def ask_exit(signame, loop, logger) -> None:
@@ -30,10 +35,19 @@ class RunnerBase:
         
         def create_task(self, function: Callable, *args) -> asyncio.Task:
             return self.loop.create_task(function(*args))
-
-        def run_task(self) -> None:
+        
+        "run the task forever, useful when the task is a process itself"
+        def run_task_forever(self) -> None:
             try:
                 self.loop.run_forever()
+            except asyncio.CancelledError:
+                pass
+
+        "runs the task and close the event loop, useful when spawning processes"
+        def run_task(self, task: asyncio.Task) -> None:
+            try:
+                self.loop.run_until_complete(task)
+                self.loop.close()
             except asyncio.CancelledError:
                 pass
 
