@@ -3,13 +3,13 @@ from datetime import datetime, timedelta
 import json
 import logging
 import os
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from web3 import Web3
 
-from config.onchain_config import *
+from account_data_fetcher.config.onchain_config import *
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
-from exchanges.coingecko.data_fetcher import DataFetcher as coingeckoDataFetcher
+from account_data_fetcher.exchanges.coingecko.data_fetcher import DataFetcher as coingeckoDataFetcher
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class balanceMetaData:
@@ -76,7 +76,7 @@ class DataFetcher(ExchangeBase):
             return json.load(f)['addresses_per_chain']["RSK"]
             
 
-    def get_netliq(self) -> float:
+    def fetch_balance(self) -> float:
         balance_by_coin: dict = self.get_token_balances_by_coin()
 
         self.logger.debug(f"{balance_by_coin=}")
@@ -121,7 +121,7 @@ class DataFetcher(ExchangeBase):
 
         return balance
     
-    def get_positions(self) -> dict:
+    def fetch_positions(self) -> dict:
         balance_by_coin = self.get_token_balances_by_coin()
 
         data_to_return = {
