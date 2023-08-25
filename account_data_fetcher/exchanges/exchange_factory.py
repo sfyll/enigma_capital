@@ -26,14 +26,7 @@ class ExchangeFactory:
 
     @classmethod
     def get_module_name(cls, exchange_name):
-        if "ib" in exchange_name.lower():
-            if exchange_name.endswith("async"):
-                module_name = f"{cls.__FILE_PREFIX}.{exchange_name.lower()}.{cls.__STANDARDIZED_FILE_NAME} + _async"
-            if exchange_name.endswith("flex_queries"):
-                module_name = f"{cls.__FILE_PREFIX}.{exchange_name.lower()}.{cls.__STANDARDIZED_FILE_NAME} + _flex_queries"
-        else:
-            module_name = f"{cls.__FILE_PREFIX}.{exchange_name.lower()}.{cls.__STANDARDIZED_FILE_NAME}"
-        return module_name
+        return f"{cls.__FILE_PREFIX}.{exchange_name.lower()}.{cls.__STANDARDIZED_FILE_NAME}"
 
     @classmethod
     def launch_exchange_and_run_request_processor(cls, exchange_name: str, *args, **kwargs) -> None:
