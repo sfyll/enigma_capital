@@ -6,13 +6,12 @@ from typing import Optional
 from setproctitle import setproctitle
 import zmq
 
-from infrastructure.log_handler import create_exchange_specific_logger
-
 class ExchangeBase(ABC):
     def __init__(self, port_number: int, exchange: str) -> None:
         setproctitle(exchange)
         self.port_number = port_number
-        self.logger = create_exchange_specific_logger(exchange)
+        self.logger = logging.getLogger(__name__)
+        self.process_request()
     
     @abstractmethod
     def fetch_balance(self, accountType: Optional[str] = None):
