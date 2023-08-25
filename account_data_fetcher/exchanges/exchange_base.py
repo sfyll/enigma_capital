@@ -7,8 +7,9 @@ from setproctitle import setproctitle
 import zmq
 
 class ExchangeBase(ABC):
+    __PROCESS_PREFIX = "fetch_"
     def __init__(self, port_number: int, exchange: str) -> None:
-        setproctitle(exchange.lower())
+        setproctitle(self.__PROCESS_PREFIX + exchange.lower())
         self.port_number = port_number
         self.logger = logging.getLogger(__name__)
         self.process_request()
