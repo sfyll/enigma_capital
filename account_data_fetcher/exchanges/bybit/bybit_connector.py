@@ -8,7 +8,7 @@ from requests import Response
 import time
 from typing import List, Optional
 
-from account_data_fetcher.bybit.exception import InvalidRequestError, FailedRequestError
+from account_data_fetcher.exchanges.bybit.exception import InvalidRequestError, FailedRequestError
 from utilities.request_handler import requestHandler
 
 class bybitApiConnector:
