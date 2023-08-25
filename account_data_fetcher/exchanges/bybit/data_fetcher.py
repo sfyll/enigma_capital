@@ -2,8 +2,8 @@ import logging
 import os
 from typing import List, Optional
 
-from exchanges.bybit.bybit_connector import bybitApiConnector
-from exchanges.bybit.exception import FailedRequestError, InvalidRequestError
+from account_data_fetcher.exchanges.bybit.bybit_connector import bybitApiConnector
+from account_data_fetcher.exchanges.bybit.exception import FailedRequestError, InvalidRequestError
 
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
