@@ -38,6 +38,6 @@ class WriterBase(ABC):
         while True:
             topic, data = socket.recv_multipart()
             if topic == b'balances':
-                self.write_balances(json.loads(data))
+                self.update_balances(json.loads(data))
             elif topic == b'positions':
-                self.write_positions(json.loads(data))
+                self.update_positions(json.loads(data))
