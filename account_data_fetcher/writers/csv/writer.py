@@ -16,7 +16,7 @@ class Writer(WriterBase):
         self.logger = logging.getLogger(__name__)
         self.path = self.get_base_path + self.__PATH_SUFFIX
 
-    def update_balances(self, balances: Dict[str: float]) -> None:
+    def update_balances(self, balances: Dict[str, float]) -> None:
         balance_path: str = self.path + 'balance.csv'
         
         try:
@@ -31,7 +31,7 @@ class Writer(WriterBase):
 
         self.logger.info(f"writting {balances=}")
 
-    def update_positions(self, positions: Dict[str: list]) -> None:
+    def update_positions(self, positions: Dict[str, list]) -> None:
         positions_path: str = self.path + 'position.csv'
         
         with open(positions_path, 'a', newline='') as csvfile:
