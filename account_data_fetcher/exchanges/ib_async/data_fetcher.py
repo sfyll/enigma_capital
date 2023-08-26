@@ -13,7 +13,6 @@ class DataFetcher(ExchangeBase):
     __HOST = "127.0.0.1"
     def __init__(self, port_number: int, app: str = "GATEWAY"):
         super().__init__(port_number, self.__EXCHANGE)
-        self.logger = logging.getLogger(__name__)
         self.__on_start(app)
         self.netliq: Optional[float] = None
 
