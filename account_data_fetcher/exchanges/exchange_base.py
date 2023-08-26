@@ -33,7 +33,7 @@ class ExchangeBase(ABC):
     def process_request(self):
         context = zmq.Context()
         socket = context.socket(zmq.PUB)
-        self.logger.debug(f"Binding {self.exchange=} at the following socket for publishing: tcp://*:{self.port_number}")
+        self.logger.debug(f"Publishing {self.exchange=} content to tcp://*:{self.port_number}")
         socket.bind(f"tcp://*:{self.port_number}")
 
         while True:
