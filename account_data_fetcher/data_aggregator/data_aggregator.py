@@ -20,6 +20,7 @@ class Subscription:
 class DataAggregatorConfig:
     fetcher_routes: Dict[str, Subscription]  # Mapping of exchange name to port_numbers for subscribing to fetchers
     writer_routes: Dict[str, Subscription]   # Mapping of writer type to port_numbers for publishing to writers
+    data_aggregator_port_number: int
     aggregation_interval: int
 
 @dataclass
@@ -77,15 +78,16 @@ class AggregatedData:
             return False
         
     def __get_object_to_send(self) -> dict:
-        to_send_object: dict = {}
+        to_send_object: dict = {"balance" : {},
+                                "positions": {}}
         self.date = time.strftime('%Y-%m-%d %H:%M:%S')
-        self.netliq = sum(self.exchanges[exchange].balance.value for exchange in self.exchanges.values())
+        self.netliq = sum(exchange.balance.value for exchange in self.exchanges.values())
         
         to_send_object["balance"]["netliq"] = self.netliq
         
         for exchange, value in self.exchanges.items():
-            to_send_object["balance"][exchange] = value.balance    
-            to_send_object["positions"][exchange] = value.position
+            to_send_object["balance"][exchange] = value.balance.value
+            to_send_object["positions"][exchange] = value.position.data
 
         return to_send_object
     
@@ -105,14 +107,14 @@ class DataAggregator:
         context = zmq.Context()
 
         # Create and bind the publisher for the writers
+        self.logger.debug(f"Publishing data_aggregator at tcp://localhost:{self.data_routes.data_aggregator_port_number}")
         pub_socket = context.socket(zmq.PUB)
-        for _, subscription in self.data_routes.writer_routes.items():
-            pub_socket.bind(f"tcp://*:{subscription['port_number']}")
+        pub_socket.bind(f"tcp://*:{self.data_routes.data_aggregator_port_number}")
 
         # Create and connect the subscriber for the fetchers
         sub_socket = context.socket(zmq.SUB)
         for exchange_name, exchange_subscription in self.data_routes.fetcher_routes.items():
-            self.logger.debug(f"Binding to {exchange_name} at tcp://localhost:{exchange_subscription['port_number']}")
+            self.logger.debug(f"Subscribing data_aggregator to {exchange_name} at tcp://localhost:{exchange_subscription['port_number']}")
             sub_socket.connect(f"tcp://localhost:{exchange_subscription['port_number']}")
             """TODO: Be able to subscribe to different topics, so that the data_aggregator
                      can scale easily to more usecases"""
