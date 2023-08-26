@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import json
 import logging
+import logging.config
 import os
 from typing import Dict
 
@@ -8,12 +9,16 @@ from setproctitle import setproctitle
 import zmq
 
 class WriterBase(ABC):
-    __PROCESS_PREFIX = "write_"
+    __PROCESS_PREFIX = "writer_"
     def __init__(self, data_aggregator_port_number: int, writer: str) -> None:
         setproctitle(self.__PROCESS_PREFIX + writer.lower())
         self.data_aggregator_port_number = data_aggregator_port_number
-        self.logger = logging.getLogger(__name__)
+        self.logger = self.init_logging()
         self.process_request()
+
+    def init_logging(self):
+        logging.config.fileConfig(self.get_base_path() + '/account_data_fetcher/config/logging_config.ini')
+        return logging.getLogger(__name__)
 
     @staticmethod
     def get_base_path():
@@ -21,11 +26,11 @@ class WriterBase(ABC):
         return os.path.abspath(os.path.join(current_directory, '..', ".."))
     
     @abstractmethod
-    def update_balances(self, balance: Dict[str: float]):
+    def update_balances(self, balance: Dict[str, float]):
         pass
 
     @abstractmethod
-    def update_positions(self, positions: Dict[str: list]):
+    def update_positions(self, positions: Dict[str, list]):
         pass
 
     def process_request(self):
