@@ -37,9 +37,6 @@ def modify_logging_config(log_file, log_level):
     config = ConfigParser()
     config.read(get_base_path() + '/account_data_fetcher/config/logging_config_launch.ini')
 
-    # Only change what you want to modify
-    print(logging.getLevelName(int(log_level)))
-    print(logging.INFO)
     if 'handler_fileHandler' in config:
         config['handler_fileHandler']['args'] = f"('{log_file}',)"
         config['handler_fileHandler']['level'] = logging.getLevelName(log_level)
@@ -65,3 +62,7 @@ def create_exchange_specific_logger(exchange_name: str) -> logging.Logger:
 def get_base_path():
     current_directory = os.path.dirname(__file__)
     return os.path.abspath(os.path.join(current_directory, '..'))
+
+def fetch_logging_config(config_path_extension: str):
+    logging.config.fileConfig(get_base_path() + config_path_extension)
+
