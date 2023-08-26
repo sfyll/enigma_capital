@@ -33,6 +33,7 @@ class ExchangeBase(ABC):
     def process_request(self):
         context = zmq.Context()
         socket = context.socket(zmq.PUB)
+        self.logger.debug(f"Binding {self.exchange=} at the following socket for publishing: tcp://*:{self.port_number}")
         socket.bind(f"tcp://*:{self.port_number}")
 
         while True:
@@ -47,7 +48,7 @@ class ExchangeBase(ABC):
 
             self.logger.debug(f"Sending {self.exchange}: {msg=}")
 
-            socket.send_string(json.dumps(msg))
+            socket.send_multipart([b"balance_and_positions", json.dumps(msg).encode()])
 
             # Sleep or wait for a signal to fetch the next data
             time.sleep(self.fetch_frequency) # 1 hours
