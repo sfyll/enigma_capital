@@ -15,7 +15,7 @@ class ProcessFactoryBase(ABC):
         
         try:
             exchange_module = import_module(module_name)
-            return getattr(exchange_module, cls.__STANDARDIZED_CLASS_NAME)
+            return getattr(exchange_module, cls._STANDARDIZED_CLASS_NAME)
         except (ImportError, AttributeError, ModuleNotFoundError) as e:
             raise Exception(f"{e=}")
 
