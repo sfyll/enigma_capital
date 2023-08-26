@@ -9,7 +9,7 @@ from infrastructure.api_secret_getter import ApiMetaData
 
 class ProcessFactory(ProcessFactoryBase):
     __FILE_PREFIX = "account_data_fetcher.exchanges"
-    __STANDARDIZED_CLASS_NAME = "DataFetcher" 
+    _STANDARDIZED_CLASS_NAME = "DataFetcher" 
     __STANDARDIZED_FILE_NAME = "data_fetcher" 
 
     @classmethod
