@@ -7,12 +7,13 @@ from infrastructure.api_secret_getter import ApiMetaData
 
 
 class ProcessFactory(ProcessFactoryBase):
-    __FILE_PREFIX = "account_data_fetcher.exchanges"
-    __STANDARDIZED_FILE_NAME = "data_fetcher" 
+    __FILE_PREFIX = "account_data_fetcher.writers"
+    _STANDARDIZED_CLASS_NAME = "Writer" 
+    __STANDARDIZED_FILE_NAME = "writer" 
 
     @classmethod
-    def get_module_name(cls, exchange_name):
-        return f"{cls.__FILE_PREFIX}.{exchange_name.lower()}.{cls.__STANDARDIZED_FILE_NAME}"
+    def get_module_name(cls, process_name):
+        return f"{cls.__FILE_PREFIX}.{process_name.lower()}.{cls.__STANDARDIZED_FILE_NAME}"
 
     @classmethod
     def main(cls):
@@ -37,7 +38,7 @@ class ProcessFactory(ProcessFactoryBase):
         kwargs_dict["secrets"] = secrets_data_class_instance
 
 
-        cls.launch_process_and_run_request_processor(args.exchange_name, **args_dict, **kwargs_dict)
+        cls.launch_process_and_run_request_processor(args.writer_name, **args_dict, **kwargs_dict)
 
 if __name__ == "__main__":
     ProcessFactory.main()
