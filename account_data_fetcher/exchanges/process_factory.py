@@ -9,11 +9,12 @@ from infrastructure.api_secret_getter import ApiMetaData
 
 class ProcessFactory(ProcessFactoryBase):
     __FILE_PREFIX = "account_data_fetcher.exchanges"
+    __STANDARDIZED_CLASS_NAME = "DataFetcher" 
     __STANDARDIZED_FILE_NAME = "data_fetcher" 
 
     @classmethod
-    def get_module_name(cls, exchange_name):
-        return f"{cls.__FILE_PREFIX}.{exchange_name.lower()}.{cls.__STANDARDIZED_FILE_NAME}"
+    def get_module_name(cls, process_name):
+        return f"{cls.__FILE_PREFIX}.{process_name.lower()}.{cls.__STANDARDIZED_FILE_NAME}"
 
     @classmethod
     def main(cls):
