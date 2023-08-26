@@ -56,7 +56,9 @@ class DataFetcher(ExchangeBase):
         self.account_meta_data: Dict[str, AccountMetaData] = {}
 
         self.decryption_password: str = password
-        self.key, _ = pgpy.PGPKey.from_file(path + "/.pk.txt")
+        current_directory = os.path.dirname(__file__)
+        base_path = os.path.abspath(os.path.join(current_directory, '..', '..', '..'))
+        self.key, _ = pgpy.PGPKey.from_file(base_path + "/account_data_fetcher/secrets/.pk.txt")
 
         # initalize the client to either use paper trading account or regular account.
         if self.config['paper_trading']:

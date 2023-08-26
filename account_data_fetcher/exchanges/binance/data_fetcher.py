@@ -156,7 +156,13 @@ class DataFetcher(ExchangeBase):
 
         df.to_csv(path)
 
-    def fetch_balance(self, accountType: str) -> float:
+    def fetch_balance(self, accountType: Optional[str] = None) -> float:
+        binance_balance: List[dict] = self.convert_balances_to_dollars(self.get_user_asset())
+        binance_isolated_margin_balance = self.convert_isolated_margin_balance_to_dollars(self.get_isolated_margin_account())
+
+        return round(binance_balance + binance_isolated_margin_balance, 3)
+
+    def fetch_specific_balance(self, accountType: str) -> float:
         if accountType == "SPOT":
             binance_balance: List[dict] = self.get_user_asset() 
             return self.convert_balances_to_dollars(binance_balance)
@@ -196,7 +202,7 @@ class DataFetcher(ExchangeBase):
 
         return round(netliq_in_dollars,3)
 
-    def fetch_positions(self) -> dict:
+    def fetch_positions(self, accountType: Optional[str] = None) -> dict:
 
         data_to_return = {
         "Symbol": [],

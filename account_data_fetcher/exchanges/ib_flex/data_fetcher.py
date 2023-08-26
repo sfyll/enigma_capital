@@ -95,6 +95,7 @@ class DataFetcher(ExchangeBase):
         return self.parse_data(data)
 
     def get_data(self, token, query_id):
+        self.logger.info(f"{token=}, {query_id=}")
         counter: int = 0
         data: Optional[bytes] = None
         while not data:

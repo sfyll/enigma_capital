@@ -65,7 +65,7 @@ class DataFetcher(ExchangeBase):
         
         return contract_by_coin
 
-    def __get_address_of_interest(self, path: str) -> list:
+    def __get_address_of_interest(self) -> list:
         """FORMAT OF meta_data.json:
         {"addresses": [] }"""
 
@@ -146,7 +146,7 @@ class DataFetcher(ExchangeBase):
         
         return round(netliq,3)
     
-    def fetch_positions(self, get_price_from_coingecko: Callable) -> dict:
+    def fetch_positions(self) -> dict:
         balance_by_coin = self.__get_total_balance_by_coin()
 
         data_to_return = {

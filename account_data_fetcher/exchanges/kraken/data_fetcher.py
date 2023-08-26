@@ -109,7 +109,7 @@ class DataFetcher(ExchangeBase):
             balance_per_coin_in_dollars=balance_per_coin_dollar
         )
         
-    def fetch_positions(self, balances: dict) -> dict:
+    def get_balance_per_ticker_in_dollars(self, balances: dict) -> dict:
         dollar_balances: dict = {}
         prices: dict = self.kraken_connector.get_ticker()
 
@@ -144,7 +144,7 @@ class DataFetcher(ExchangeBase):
 
         return balances
 
-    def get_positions(self, accountType: str = "SPOT") -> dict:
+    def fetch_positions(self, accountType: str = "SPOT") -> dict:
         self.__update_balances(accountType)
         return self.balance_meta_data.get_position()
     

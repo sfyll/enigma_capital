@@ -40,11 +40,16 @@ class DataFetcher(ExchangeBase):
     def is_connected(self) -> bool:
         return self.ib.isConnected()
 
-    def get_netliq(self) -> float:
+    def fetch_balance(self) -> float:
         while self.netliq is None:
             self.ib.sleep(1)
         else:
             return self.netliq
+        
+    #TODO: Fetch positions
+    def fetch_positions(self) -> float:
+        ...
+
 
 
 if __name__ == '__main__':

@@ -57,7 +57,7 @@ class DataFetcher(ExchangeBase):
 
             return round(spot_netliq + derivative_balance)
         
-    def fetch_positions(self) -> dict:
+    def fetch_positions(self, accountType = "UNIFIED") -> dict:
         data_to_return = {
         "Symbol": [],
         "Multiplier": [],
@@ -65,26 +65,47 @@ class DataFetcher(ExchangeBase):
         "Dollar Quantity": []
         }
         
-        spot_positions = self.__get_spot_positions()
-        future_positions = self.__get_derivatives_positions()
-        unified_positions = self.__get_unified_positions()
+        if accountType == "UNIFIED":
+            future_positions = self.__get_derivatives_positions()
+            unified_positions = self.__get_unified_positions()
 
-        all_positions = [spot_positions, future_positions, unified_positions]
+            all_positions = [future_positions, unified_positions]
 
-        # Aggregating positions by symbol
-        for pos in all_positions:
-            for i, symbol in enumerate(pos["Symbol"]):
-                if symbol in data_to_return["Symbol"]:
-                    index = data_to_return["Symbol"].index(symbol)
-                    data_to_return["Quantity"][index] += pos["Quantity"][i]
-                    data_to_return["Dollar Quantity"][index] += pos["Dollar Quantity"][i]
-                else:
-                    data_to_return["Symbol"].append(symbol)
-                    data_to_return["Multiplier"].append(1)
-                    data_to_return["Quantity"].append(pos["Quantity"][i])
-                    data_to_return["Dollar Quantity"].append(pos["Dollar Quantity"][i])
+            # Aggregating positions by symbol
+            for pos in all_positions:
+                for i, symbol in enumerate(pos["Symbol"]):
+                    if symbol in data_to_return["Symbol"]:
+                        index = data_to_return["Symbol"].index(symbol)
+                        data_to_return["Quantity"][index] += pos["Quantity"][i]
+                        data_to_return["Dollar Quantity"][index] += pos["Dollar Quantity"][i]
+                    else:
+                        data_to_return["Symbol"].append(symbol)
+                        data_to_return["Multiplier"].append(1)
+                        data_to_return["Quantity"].append(pos["Quantity"][i])
+                        data_to_return["Dollar Quantity"].append(pos["Dollar Quantity"][i])
 
-        return data_to_return
+            return data_to_return
+        
+        else:
+            spot_positions = self.__get_spot_positions()
+            future_positions = self.__get_derivatives_positions()
+
+            all_positions = [spot_positions, future_positions]
+
+            # Aggregating positions by symbol
+            for pos in all_positions:
+                for i, symbol in enumerate(pos["Symbol"]):
+                    if symbol in data_to_return["Symbol"]:
+                        index = data_to_return["Symbol"].index(symbol)
+                        data_to_return["Quantity"][index] += pos["Quantity"][i]
+                        data_to_return["Dollar Quantity"][index] += pos["Dollar Quantity"][i]
+                    else:
+                        data_to_return["Symbol"].append(symbol)
+                        data_to_return["Multiplier"].append(1)
+                        data_to_return["Quantity"].append(pos["Quantity"][i])
+                        data_to_return["Dollar Quantity"].append(pos["Dollar Quantity"][i])
+
+            return data_to_return
 
     def fetch_specific_positions(self, market: str) -> dict:
         if market == "SPOT":
