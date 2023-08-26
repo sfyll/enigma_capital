@@ -1,21 +1,52 @@
-import logging
+from configparser import ConfigParser
+import logging.config
 import os
 
-def args_handler(args):    
-    # Setup logging
-    args.verbosity = args.verbose - args.quiet
-    if args.verbosity == 0:
-        logging.root.setLevel(logging.INFO)
-    elif args.verbosity >= 1:
-        logging.root.setLevel(logging.DEBUG)
-    elif args.verbosity == -1:
-        logging.root.setLevel(logging.WARNING)
-    elif args.verbosity <= -2:
-        logging.root.setLevel(logging.ERROR)
+def logging_handler(args):
+    log_file = args.log_file  # obtained from CLI
+
+    # Load from config file
+    logging.config.fileConfig(get_base_path() + '/account_data_fetcher/config/logging_config_launch.ini')
+
+
+    # Dynamically update log file name
+    file_handler = logging.FileHandler(filename=log_file)
     
-    logging.basicConfig(format='%(levelname)s - %(asctime)s - %(name)s - %(message)s', filename=args.log_file)
+    # Update root logger
+    logging.getLogger().addHandler(file_handler)
+
+    # Set log level based on CLI
+    args.verbosity = args.verbose - args.quiet
+    log_level = logging.INFO  # default
+    if args.verbosity == 0:
+        log_level = logging.INFO
+    elif args.verbosity >= 1:
+        log_level = logging.DEBUG
+    elif args.verbosity == -1:
+        log_level = logging.WARNING
+    elif args.verbosity <= -2:
+        log_level = logging.ERROR
+
+    logging.getLogger().setLevel(log_level)
+
+    modify_logging_config(args.log_file,log_level)
 
     return args
+
+def modify_logging_config(log_file, log_level):
+    config = ConfigParser()
+    config.read(get_base_path() + '/account_data_fetcher/config/logging_config_launch.ini')
+
+    # Only change what you want to modify
+    print(logging.getLevelName(int(log_level)))
+    print(logging.INFO)
+    if 'handler_fileHandler' in config:
+        config['handler_fileHandler']['args'] = f"('{log_file}',)"
+        config['handler_fileHandler']['level'] = logging.getLevelName(log_level)
+
+    with open(get_base_path() + '/account_data_fetcher/config/logging_config.ini', 'w') as configfile:
+        config.write(configfile)
+
 
 def create_exchange_specific_logger(exchange_name: str) -> logging.Logger:
     logger = logging.getLogger(exchange_name)
@@ -30,3 +61,7 @@ def create_exchange_specific_logger(exchange_name: str) -> logging.Logger:
         logger.addHandler(file_handler)
 
     return logger
+
+def get_base_path():
+    current_directory = os.path.dirname(__file__)
+    return os.path.abspath(os.path.join(current_directory, '..'))
