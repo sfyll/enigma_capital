@@ -11,10 +11,10 @@ import pandas as pd
 class Writer(WriterBase):
     __WRITER = "CSV"
     __PATH_SUFFIX = "/account_data_fetcher/csv_db/"
-    def __init__(self, port_number: float) -> None:
-        super().__init__(port_number, self.__WRITER)
+    def __init__(self, data_aggregator_port_number: int, port_number: int) -> None:
+        super().__init__(data_aggregator_port_number, port_number, self.__WRITER)
         self.logger = logging.getLogger(__name__)
-        self.path = self.get_base_path + self.__PATH_SUFFIX
+        self.path = self.get_base_path() + self.__PATH_SUFFIX
 
     def update_balances(self, balances: Dict[str, float]) -> None:
         balance_path: str = self.path + 'balance.csv'

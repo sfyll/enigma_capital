@@ -13,8 +13,8 @@ class Writer(WriterBase):
     __SCOPE = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
                "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
     __WRITER = "GSHEET"
-    def __init__(self, secrets: ApiMetaData, port_number: float) -> None:
-        super().__init__(port_number, self.__WRITER)
+    def __init__(self, secrets: ApiMetaData, data_aggregator_port_number: int, port_number: int) -> None:
+        super().__init__(data_aggregator_port_number, port_number, self.__WRITER)
         self.logger = logging.getLogger(__name__)
         self.authenticate(secrets)
 
