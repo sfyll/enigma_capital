@@ -8,16 +8,17 @@ from typing import Dict
 from setproctitle import setproctitle
 import zmq
 
+from infrastructure.log_handler import fetch_logging_config
+
 class WriterBase(ABC):
     __PROCESS_PREFIX = "writer_"
     def __init__(self, data_aggregator_port_number: int, writer: str) -> None:
         setproctitle(self.__PROCESS_PREFIX + writer.lower())
         self.data_aggregator_port_number = data_aggregator_port_number
         self.logger = self.init_logging()
-        self.process_request()
 
     def init_logging(self):
-        logging.config.fileConfig(self.get_base_path() + '/account_data_fetcher/config/logging_config.ini')
+        fetch_logging_config('/account_data_fetcher/config/logging_config.ini')
         return logging.getLogger(__name__)
 
     @staticmethod
