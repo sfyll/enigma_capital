@@ -1,3 +1,5 @@
 #!/usr/bin/env zsh
 
-pkill -f balance_and_position_fetcher
+pkill fetch_
+pkill data_aggregator
+pkill writer_
