@@ -37,7 +37,7 @@ class ApiSecretGetter:
         return api_meta_data
 
     @staticmethod
-    def get_gsheet_meta_data(path: str, pwd: str) -> dict:
+    def get_gsheet_meta_data(path: str, pwd: str) -> ApiMetaData:
         try:
             key = encryptor.get_key_from_current_file(path)
             encrypted_meta_data = encryptor.get_encrypted_gsheet_meta_data(path)
@@ -45,4 +45,7 @@ class ApiSecretGetter:
             raise e
         with key.unlock(pwd):
             meta_data: str = encryptor.pgpy_decrypt(key, encrypted_meta_data).replace('\'', '\"')
-            return json.loads(meta_data)
+            return ApiMetaData(
+                key="",
+                secret="",
+                other_fields=json.loads(meta_data))
