@@ -44,9 +44,9 @@ class ExchangeData:
     position: PositionData = field(default_factory=PositionData)
     last_fetch_timestamp: float = 0
 
-    def update(self, balance: float, positions: Dict[str, list]) -> None:
-        self.update_balance(balance)
-        self.update_position(positions)
+    def update(self, balance_and_positions_dict: dict) -> None:
+        self.update_balance(balance_and_positions_dict["balance"])
+        self.update_position(balance_and_positions_dict["positions"])
         self.last_fetch_timestamp = time.time()
 
     def update_balance(self, value: float):
@@ -59,6 +59,7 @@ class ExchangeData:
 class AggregatedData:
     aggregation_interval: int
     date: str
+    data_routes: DataAggregatorConfig
     netliq: float = 0
     exchanges: Dict[str, ExchangeData] = field(default_factory=dict)
 
@@ -67,27 +68,45 @@ class AggregatedData:
             return self.__get_object_to_send()
 
     def __can_send(self) -> bool:
+        if set(self.exchanges.keys()) != set(self.data_routes.fetcher_routes.keys()):
+            return False
+        
+        # Existing logic for time delay
         oldest_fetch_timestamp = min(
             exchange.last_fetch_timestamp for exchange in self.exchanges.values()
         )
-        
-        if time.time() - oldest_fetch_timestamp >= self.aggregation_interval:
-            return True
-        
-        else:
-            return False
+
+        return time.time() - oldest_fetch_timestamp >= self.aggregation_interval
+
         
     def __get_object_to_send(self) -> dict:
+        position_dict: dict = {
+            "date": [],
+            "Exchange": [],
+            "Symbol": [],
+            "Multiplier": [],
+            "Quantity": [],
+            "Dollar Quantity": [],
+        }
+
         to_send_object: dict = {"balance" : {},
-                                "positions": {}}
+                                "positions": position_dict}
+        
         self.date = time.strftime('%Y-%m-%d %H:%M:%S')
         self.netliq = sum(exchange.balance.value for exchange in self.exchanges.values())
         
         to_send_object["balance"]["netliq"] = self.netliq
+        to_send_object["balance"]["date"] = self.date
         
         for exchange, value in self.exchanges.items():
             to_send_object["balance"][exchange] = value.balance.value
-            to_send_object["positions"][exchange] = value.position.data
+
+            to_send_object["positions"]["date"] += [self.date] * len(value.position.data["Symbol"])
+            to_send_object["positions"]["Exchange"] += [self.date] * len(value.position.data["Symbol"])
+            to_send_object["positions"]["Symbol"] += value.position.data["Symbol"]
+            to_send_object["positions"]["Multiplier"] +=  value.position.data["Multiplier"]
+            to_send_object["positions"]["Quantity"] += value.position.data["Quantity"]
+            to_send_object["positions"]["Dollar Quantity"] += value.position.data["Dollar Quantity"]
 
         return to_send_object
     
@@ -95,9 +114,11 @@ class DataAggregator:
     def __init__(self, config: DataAggregatorConfig) -> None:
         setproctitle("data_aggregator")
         self.logger = self.init_logging()
-        self.data_routes = config
         self.path = os.path.realpath(os.path.dirname(__file__))
-        self.aggregated_data = AggregatedData(aggregation_interval=config.aggregation_interval, date="", exchanges={})
+        self.aggregated_data = self.aggregated_data = AggregatedData(aggregation_interval=config.aggregation_interval, 
+                                                                     date="", 
+                                                                     exchanges={}, 
+                                                                     data_routes=config)
 
     def init_logging(self):
         fetch_logging_config('/account_data_fetcher/config/logging_config.ini')
@@ -107,13 +128,13 @@ class DataAggregator:
         context = zmq.Context()
 
         # Create and bind the publisher for the writers
-        self.logger.debug(f"Publishing data_aggregator at tcp://localhost:{self.data_routes.data_aggregator_port_number}")
+        self.logger.debug(f"Publishing data_aggregator at tcp://localhost:{self.aggregated_data.data_routes.data_aggregator_port_number}")
         pub_socket = context.socket(zmq.PUB)
-        pub_socket.bind(f"tcp://*:{self.data_routes.data_aggregator_port_number}")
+        pub_socket.bind(f"tcp://*:{self.aggregated_data.data_routes.data_aggregator_port_number}")
 
         # Create and connect the subscriber for the fetchers
         sub_socket = context.socket(zmq.SUB)
-        for exchange_name, exchange_subscription in self.data_routes.fetcher_routes.items():
+        for exchange_name, exchange_subscription in self.aggregated_data.data_routes.fetcher_routes.items():
             self.logger.debug(f"Subscribing data_aggregator to {exchange_name} at tcp://localhost:{exchange_subscription['port_number']}")
             sub_socket.connect(f"tcp://localhost:{exchange_subscription['port_number']}")
             """TODO: Be able to subscribe to different topics, so that the data_aggregator
@@ -126,7 +147,8 @@ class DataAggregator:
             # Receive from fetchers
             _, data = sub_socket.recv_multipart()
             balance_and_positions_dict = json.loads(data.decode())
-            
+            exchange_name = balance_and_positions_dict.pop("exchange")
+
             self.logger.debug(f"Received {exchange_name=}, {data=}")
 
             if exchange_name not in self.aggregated_data.exchanges:
@@ -135,15 +157,13 @@ class DataAggregator:
                     position=PositionData(data=balance_and_positions_dict['positions']),
                     last_fetch_timestamp=time.time()
                 )
+
             else:
-                self.aggregated_data.exchanges[exchange_name].update(data)
+                self.aggregated_data.exchanges[exchange_name].update(balance_and_positions_dict)
             objects_to_send: Optional[dict] = self.aggregated_data.get_object_if_ready()
             if objects_to_send:
                 self.logger.debug(f"Sending {objects_to_send=}")
                 pub_socket.send_multipart([b"balance_and_positions", json.dumps(objects_to_send).encode()])
-                # pub_socket.send_string(json.dumps(objects_to_send))
-                    # pub_socket.send_json(position_to_send)
-
 
 if __name__ == '__main__':
     import argparse
