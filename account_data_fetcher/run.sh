@@ -13,4 +13,4 @@ cd $ENIGMA
 
 source env/bin/activate
 
-python3 -m account_data_fetcher.launcher.runner --log-file ~/log/runner.log --seconds 86400 -vvv -q --exchanges BYBIT DYDX TradeStation Ethereum IB_flex Kraken Rsk --writers csv gsheet
+python3 -m account_data_fetcher.launcher.runner --log-file ~/log/runner.log --seconds 86400 -vvv -q --exchanges Binance BYBIT DYDX Ethereum TradeStation IB_flex Kraken Rsk --writers csv gsheet
