@@ -13,7 +13,7 @@ class ExchangeBase(ABC):
     __PROCESS_PREFIX = "fetch_"
     def __init__(self, port_number: int, exchange: str, fetch_frequency: int = 60*60) -> None:
         setproctitle(self.__PROCESS_PREFIX + exchange.lower())
-        self.exchange: str = exchange
+        self.exchange: str = exchange.lower()
         self.port_number = port_number
         self.fetch_frequency = fetch_frequency
         self.logger = self.init_logging()
@@ -42,6 +42,7 @@ class ExchangeBase(ABC):
             positions_data = self.fetch_positions()
 
             msg: dict = {
+                "exchange": self.exchange,
                 "balance": balance_data,
                 "positions": positions_data 
             }
