@@ -138,7 +138,7 @@ if __name__ == "__main__":
     args = logging_handler(args)
     pwd = getpass("provide password for pk:")
 
-    executor = Runner()
+    executor = Runner(pwd)
     
     logging.info("Launching Process")
 
