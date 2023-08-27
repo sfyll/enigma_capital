@@ -13,7 +13,7 @@ from infrastructure.api_secret_getter import ApiSecretGetter
 
 
 class Runner(RunnerBase):
-        def __init__(self, logger: Optional[Logger] = None):
+        def __init__(self, pwd: str, logger: Optional[Logger] = None):
             super().__init__(logger)
             self.port_per_process, self.secrets_per_process = self.outer_set_input_builder(pwd)
 
@@ -142,9 +142,9 @@ if __name__ == "__main__":
     
     logging.info("Launching Process")
 
-    executor.launch_data_aggregator("data_aggregator", args.seconds, args.exchanges, args.writers)
+    # executor.launch_data_aggregator("data_aggregator", args.seconds, args.exchanges, args.writers)
 
-    executor.launch_processes(pwd, 'writer', args.writers, 'writers')
+    # executor.launch_processes(pwd, 'writer', args.writers, 'writers')
 
     executor.launch_processes(pwd, 'exchange', args.exchanges, 'exchanges')
 
