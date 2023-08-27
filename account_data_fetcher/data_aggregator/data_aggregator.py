@@ -74,8 +74,9 @@ class AggregatedData:
             return False
 
         #if aggregation interval == 24h, we're assuming we want to post on new day as defined by IB
-        if self.aggregation_interval == 86400 and not self.__is_new_day():
-            return False
+        if self.aggregation_interval == 86400:
+            if self.__is_new_day():
+                return True
 
         else:
             oldest_fetch_timestamp = min(
