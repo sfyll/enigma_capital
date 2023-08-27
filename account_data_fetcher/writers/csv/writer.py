@@ -18,21 +18,6 @@ class Writer(WriterBase):
         self.path = self.get_base_path() + self.__PATH_SUFFIX
 
     def update_balances(self, balances: Dict[str, float]) -> None:
-        balance_path: str = self.path + 'balance.csv'
-        
-        try:
-            with open(balance_path, 'a', newline='') as csvfile:
-                writer = DictWriter(csvfile, fieldnames=balances.keys())
-                # If the file is empty, write the headers
-                if csvfile.tell() == 0:
-                    writer.writeheader()
-                writer.writerow(balances)
-        except FileNotFoundError:
-            pd.DataFrame([balances]).set_index("date").to_csv(balance_path)
-
-        self.logger.info(f"writting {balances=}")
-
-    def update_balances(self, balances: Dict[str, float]) -> None:
         balance_path = self.path + 'balance.csv'
 
         try:
