@@ -142,9 +142,9 @@ if __name__ == "__main__":
     
     logging.info("Launching Process")
 
-    # executor.launch_data_aggregator("data_aggregator", args.seconds, args.exchanges, args.writers)
+    executor.launch_data_aggregator("data_aggregator", args.seconds, args.exchanges, args.writers)
 
-    # executor.launch_processes(pwd, 'writer', args.writers, 'writers')
+    executor.launch_processes(pwd, 'writer', args.writers, 'writers')
 
     executor.launch_processes(pwd, 'exchange', args.exchanges, 'exchanges')
 
