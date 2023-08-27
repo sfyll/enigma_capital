@@ -1,5 +1,6 @@
 import logging
 from dataclasses import asdict
+from datetime import datetime
 import os
 from typing import Dict
 
@@ -26,6 +27,33 @@ class Writer(WriterBase):
                 if csvfile.tell() == 0:
                     writer.writeheader()
                 writer.writerow(balances)
+        except FileNotFoundError:
+            pd.DataFrame([balances]).set_index("date").to_csv(balance_path)
+
+        self.logger.info(f"writting {balances=}")
+
+    def update_balances(self, balances: Dict[str, float]) -> None:
+        balance_path = self.path + 'balance.csv'
+
+        try:
+            df = pd.read_csv(balance_path, nrows=1)  # Read just the first row to get columns
+            existing_columns = set(df.columns)
+            new_columns = set(balances.keys())
+            
+            if existing_columns != new_columns:
+                # Rewrite the whole CSV only when columns differ
+                df = pd.read_csv(balance_path, index_col="date")  # Read the entire CSV
+                for col in new_columns - existing_columns:
+                    df[col] = float(0)
+                
+                df = pd.concat([df, pd.DataFrame([balances]).set_index("date")])
+                df.to_csv(balance_path)
+            else:
+                # Append the new row when columns are the same
+                with open(balance_path, 'a', newline='') as csvfile:
+                    writer = DictWriter(csvfile, fieldnames=balances.keys())
+                    writer.writerow(balances)
+                    
         except FileNotFoundError:
             pd.DataFrame([balances]).set_index("date").to_csv(balance_path)
 
