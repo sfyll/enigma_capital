@@ -2,7 +2,6 @@
 env/
 .DS_Store
 __pycache__/
-*.csv
 .api_enc.txt
 .pk.txt
 pyrightconfig.json
