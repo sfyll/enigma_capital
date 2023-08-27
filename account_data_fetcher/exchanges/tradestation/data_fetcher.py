@@ -33,7 +33,7 @@ class DataFetcher(ExchangeBase):
     __API_VERSION = "v3"
     __PAPER_RESOURCE = "https://sim-api.tradestation.com"
 
-    def __init__(self, password: str, secrets: ApiMetaData, port_number: int,  paper_trading = False,
+    def __init__(self, password: str, secrets: ApiMetaData, port_number: int, paper_trading = False,
                 cache_state = True, refresh_enabled = True) -> None:
         super().__init__(port_number, self.__EXCHANGE)
         self.config = {
@@ -57,8 +57,8 @@ class DataFetcher(ExchangeBase):
 
         self.decryption_password: str = password
         current_directory = os.path.dirname(__file__)
-        base_path = os.path.abspath(os.path.join(current_directory, '..', '..', '..'))
-        self.key, _ = pgpy.PGPKey.from_file(base_path + "/account_data_fetcher/secrets/.pk.txt")
+        self.base_path = os.path.abspath(os.path.join(current_directory, '..', '..', '..'))
+        self.key, _ = pgpy.PGPKey.from_file(self.base_path + "/account_data_fetcher/secrets/.pk.txt")
 
         # initalize the client to either use paper trading account or regular account.
         if self.config['paper_trading']:
@@ -157,9 +157,8 @@ class DataFetcher(ExchangeBase):
         """
 
         # Grab the current directory of the client file, that way we can store the JSON file in the same folder.
-        parent_dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
         filename = '.ts_state_enc.txt'
-        file_path = os.path.join(parent_dir_path, filename)
+        file_path = self.base_path + "/account_data_fetcher/secrets/" + filename
 
         try:
             # Define the initalized state, these are the default values.
@@ -834,10 +833,12 @@ class DataFetcher(ExchangeBase):
 
 
 if __name__ == '__main__':
+    from account_data_fetcher.launcher.runner import Runner
     from getpass import getpass
     pwd = getpass("provide password for pk:")
+    runner = Runner(pwd)
     current_path = os.path.realpath(os.path.dirname(__file__))
-    executor = tradesStationDataFetcher(current_path, pwd)
-    balances = executor.get_sum_of_balance()
+    executor = DataFetcher(pwd, runner.secrets_per_process["tradestation"], runner.port_per_process["tradestation"])
+    balances = executor.fetch_balance()
     print(balances)
 
