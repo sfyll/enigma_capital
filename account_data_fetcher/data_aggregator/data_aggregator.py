@@ -97,11 +97,11 @@ class AggregatedData:
         return current_date != last_sent_date
         
     def __get_object_to_send(self) -> dict:
-        self.date = time.strftime('%Y-%m-%d %H:%M:%S')
         self.netliq = sum(exchange.balance.value for exchange in self.exchanges.values())
+        self.date = time.strftime('%Y-%m-%d %H:%M:%S')
 
         to_send_object = {
-            "balance": {"netliq": self.netliq, "date": self.date},
+            "balance": {"date": self.date, "netliq": self.netliq},
             "positions": {
                 key: [] for key in ["date", "Exchange", "Symbol", "Multiplier", "Quantity", "Dollar Quantity"]
             }
