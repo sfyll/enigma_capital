@@ -1,4 +1,4 @@
 .ts_state_enc.txt
 .gsheet.txt
-*.json
+onchain_meta_data.json
 logging*

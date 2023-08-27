@@ -1,0 +1,17 @@
+{
+    "Binance": 49152,
+    "BYBIT": 49153,
+    "DYDX": 49154,
+    "FTX": 49155,
+    "IB_FLEX": 49156,
+    "IB_ASYNC": 49157,
+    "Kraken": 49158,
+    "ethereum": 49159,
+    "rsk": 49160,
+    "TradeStation": 49161,
+
+    "DataAggregator": 49250,
+
+    "csv": 49300,
+    "gsheet": 49301  
+}
