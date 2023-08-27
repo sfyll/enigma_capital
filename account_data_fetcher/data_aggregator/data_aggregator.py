@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 import json
 import logging
 import logging.config
 import os
+import pytz
 import time
 from typing import Dict, List, Optional, Set
 
@@ -70,30 +72,40 @@ class AggregatedData:
     def __can_send(self) -> bool:
         if set(self.exchanges.keys()) != set(self.data_routes.fetcher_routes.keys()):
             return False
+
+        #if aggregation interval == 24h, check that we've got a new day taking into account IB timezone
+        if self.aggregation_interval == 86400 and not self.__is_new_day():
+            return False
         
-        # Existing logic for time delay
         oldest_fetch_timestamp = min(
             exchange.last_fetch_timestamp for exchange in self.exchanges.values()
         )
 
         return time.time() - oldest_fetch_timestamp >= self.aggregation_interval
 
+    def __is_new_day(self, offset: int = -5):
+        local_tz = pytz.timezone('Etc/GMT+5')  # Adjusting for -5h offset
+        utc_time = pytz.utc.localize(datetime.utcnow())
+        local_time = utc_time.astimezone(local_tz)
+
+        if local_time.hour < 5:  # Wait until 5 AM local time
+            return False
+
+        current_date = local_time.date()
+        last_sent_date = datetime.strptime(self.date, "%Y-%m-%d %H:%M:%S").date() if self.date else None
+
+        return current_date != last_sent_date
         
     def __get_object_to_send(self) -> dict:
-        position_dict: dict = {
-            "date": [],
-            "Exchange": [],
-            "Symbol": [],
-            "Multiplier": [],
-            "Quantity": [],
-            "Dollar Quantity": [],
-        }
-
-        to_send_object: dict = {"balance" : {},
-                                "positions": position_dict}
-        
         self.date = time.strftime('%Y-%m-%d %H:%M:%S')
         self.netliq = sum(exchange.balance.value for exchange in self.exchanges.values())
+
+        to_send_object = {
+            "balance": {"netliq": self.netliq, "date": self.date},
+            "positions": {
+                key: [] for key in ["date", "Exchange", "Symbol", "Multiplier", "Quantity", "Dollar Quantity"]
+            }
+        }
         
         to_send_object["balance"]["netliq"] = self.netliq
         to_send_object["balance"]["date"] = self.date
@@ -101,12 +113,13 @@ class AggregatedData:
         for exchange, value in self.exchanges.items():
             to_send_object["balance"][exchange] = value.balance.value
 
-            to_send_object["positions"]["date"] += [self.date] * len(value.position.data["Symbol"])
-            to_send_object["positions"]["Exchange"] += [self.date] * len(value.position.data["Symbol"])
-            to_send_object["positions"]["Symbol"] += value.position.data["Symbol"]
-            to_send_object["positions"]["Multiplier"] +=  value.position.data["Multiplier"]
-            to_send_object["positions"]["Quantity"] += value.position.data["Quantity"]
-            to_send_object["positions"]["Dollar Quantity"] += value.position.data["Dollar Quantity"]
+            len_data = len(value.position.data["Symbol"])
+
+            to_send_object["positions"]["date"].extend([self.date] * len_data)
+            to_send_object["positions"]["Exchange"].extend([exchange] * len_data)
+
+            for key in ["Symbol", "Multiplier", "Quantity", "Dollar Quantity"]:
+                to_send_object["positions"][key].extend(value.position.data[key])
 
         return to_send_object
     
@@ -144,7 +157,6 @@ class DataAggregator:
             #     sub_socket.subscribe(topic)
 
         while True:
-            # Receive from fetchers
             _, data = sub_socket.recv_multipart()
             balance_and_positions_dict = json.loads(data.decode())
             exchange_name = balance_and_positions_dict.pop("exchange")
