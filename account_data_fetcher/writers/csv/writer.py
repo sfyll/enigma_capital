@@ -45,15 +45,29 @@ class Writer(WriterBase):
         self.logger.info(f"writting {balances=}")
 
     def update_positions(self, positions: Dict[str, list]) -> None:
-        positions_path: str = self.path + 'position.csv'
+        positions_path = f"{self.path}position.csv"
         
-        with open(positions_path, 'a', newline='') as csvfile:
-            writer = DictWriter(csvfile, fieldnames=positions.keys())
-            if csvfile.tell() == 0:
+        try:
+            df = pd.read_csv(positions_path, nrows=1)  # Read just the first row to get columns
+            existing_columns = set(df.columns)
+            new_columns = set(positions.keys())
+
+            if existing_columns != new_columns:
+                raise ValueError("CSV headers don't match. Exiting without writing since logic is not handled.")
+
+            # Continue with the normal logic of writing
+            with open(positions_path, 'a', newline='') as csvfile:
+                writer = DictWriter(csvfile, fieldnames=positions.keys())
+                for row in zip(*positions.values()):
+                    writer.writerow(dict(zip(positions.keys(), row)))
+
+        except FileNotFoundError:
+            with open(positions_path, 'w', newline='') as csvfile:
+                writer = DictWriter(csvfile, fieldnames=positions.keys())
                 writer.writeheader()
-            for row in zip(*positions.values()):
-                writer.writerow(dict(zip(positions.keys(), row)))
-        
+                for row in zip(*positions.values()):
+                    writer.writerow(dict(zip(positions.keys(), row)))
+
         self.logger.info(f"writting {positions=}")
 
 
