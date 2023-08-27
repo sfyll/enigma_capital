@@ -51,5 +51,7 @@ class WriterBase(ABC):
             
             balance_and_positions_dict = json.loads(data.decode())
 
+            self.logger.debug(f"writing {balance_and_positions_dict=}")
+
             self.update_balances(balance_and_positions_dict["balance"])
             self.update_positions(balance_and_positions_dict["positions"])
