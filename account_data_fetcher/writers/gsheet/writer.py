@@ -1,7 +1,9 @@
 import logging
 from dataclasses import asdict
 import os
+from typing import Dict
 
+import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -19,7 +21,7 @@ class Writer(WriterBase):
         self.authenticate(secrets)
 
     def authenticate(self, secrets: ApiMetaData) -> None:
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(asdict(secrets), scopes=self.__SCOPE)
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(asdict(secrets)["other_fields"], scopes=self.__SCOPE)
         self.client = gspread.authorize(credentials)
 
     def write_balances(self, csv_path: str) -> None:
@@ -34,24 +36,72 @@ class Writer(WriterBase):
             content = file_obj.read()
             self.client.import_csv(spreadsheet.id, data = content)
 
-    def update_balances(self, balance_dict: dict) -> None:
-        spreadsheet = self.client.open('Netliq')
+    def update_balances(self, balances: Dict[str, float]) -> None:
+        spreadsheet = self.client.open('Balances')
         worksheet = spreadsheet.get_worksheet(0)
         
-        if worksheet.row_count == 0:
-            worksheet.append_row(list(balance_dict.keys()))
+        # Fetch only the headers
+        headers = worksheet.row_values(1)
+        
+        new_columns = list(balances.keys())
+        set_new_columns = set(new_columns)
+        set_headers = set(headers)
 
-        worksheet.append_row(list(balance_dict.values()))
+        # If the sheet is empty
+        if not headers:
+            # Add headers and the first row
+            worksheet.append_row(new_columns)
+            worksheet.append_row(list(balances.values()))
+            return       
+
+        if set_new_columns != set_headers:
+            if set_new_columns.issuperset(set_headers):
+                # New columns added, rewrite the entire sheet
+                records = worksheet.get_all_records()
+                df = pd.DataFrame(records)
+                
+                for col in set_new_columns - set_headers:
+                    df[col] = float(0)
+                
+                new_row = pd.DataFrame([balances]).set_index("date")
+                df = pd.concat([df, new_row])
+                
+                # Update the entire Google Sheet
+                worksheet.clear()
+                worksheet.append_row(new_columns)
+                for _, row in df.iterrows():
+                    worksheet.append_row(list(row))
+            
+            elif set_new_columns.issubset(set_headers):
+                # Missing columns, fill in zeros for the missing fields and append the row
+                row_to_append = [balances.get(col, float(0)) for col in headers]
+                worksheet.append_row(row_to_append)
+
+            else:
+            # Columns are different but neither set is a subset of the other / might be due to different naming convention1
+            # Append the new columns on the right side and fill in zeros for old records
+                new_cols_to_add = list(set_new_columns - set_headers)
+                worksheet.append_row(new_cols_to_add, table_range="B1")
+                row_to_append = [balances.get(col, float(0)) for col in headers] + [balances.get(col, float(0)) for col in new_cols_to_add]
+                worksheet.append_row(row_to_append)
+
+        else:
+            # Columns match, just append the row
+            worksheet.append_row(list(balances.values()))
+
 
     def update_positions(self, position_dict: dict) -> None:
-        spreadsheet = self.client.open("Position")
+        spreadsheet = self.client.open("Positions")
         worksheet = spreadsheet.get_worksheet(0)
 
-        rows = list(zip(*position_dict.values()))
-
-        if worksheet.row_count == 0:
+        headers = worksheet.row_values(1)
+        if headers:
+            if headers != list(position_dict.keys()):
+                raise ValueError("CSV headers don't match. Exiting without writing.")
+        else:
             worksheet.append_row(list(position_dict.keys()))
 
+        rows = list(zip(*position_dict.values()))
         for row in rows:
             worksheet.append_row(list(row))
 

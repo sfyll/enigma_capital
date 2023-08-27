@@ -22,27 +22,37 @@ class Writer(WriterBase):
 
         try:
             df = pd.read_csv(balance_path, nrows=1)  # Read just the first row to get columns
-            existing_columns = set(df.columns)
-            new_columns = set(balances.keys())
+            existing_columns = list(df.columns)
+            new_columns = list(balances.keys())
             
             if existing_columns != new_columns:
-                # Rewrite the whole CSV only when columns differ
-                df = pd.read_csv(balance_path, index_col="date")  # Read the entire CSV
-                for col in new_columns - existing_columns:
-                    df[col] = float(0)
+                set_existing_columns = set(existing_columns)
+                set_new_columns = set(new_columns)
                 
-                df = pd.concat([df, pd.DataFrame([balances]).set_index("date")])
-                df.to_csv(balance_path)
+                if set_new_columns.issuperset(set_existing_columns):
+                    # New columns added, rewrite the whole CSV
+                    df = pd.read_csv(balance_path, index_col="date")
+                    for col in set_new_columns - set_existing_columns:
+                        df[col] = float(0)
+                    
+                    new_row = pd.DataFrame([balances]).set_index("date")
+                    df = pd.concat([df, new_row])
+                    df.to_csv(balance_path)
+                    
+                elif set_new_columns.issubset(set_existing_columns):
+                    # Missing columns, append only with a new row filled appropriately
+                    balances = {col: balances.get(col, float(0)) for col in existing_columns}
+                    with open(balance_path, 'a', newline='') as csvfile:
+                        writer = DictWriter(csvfile, fieldnames=existing_columns)
+                        writer.writerow(balances)
             else:
-                # Append the new row when columns are the same
+                # Columns match, just append the row
                 with open(balance_path, 'a', newline='') as csvfile:
                     writer = DictWriter(csvfile, fieldnames=balances.keys())
                     writer.writerow(balances)
                     
         except FileNotFoundError:
             pd.DataFrame([balances]).set_index("date").to_csv(balance_path)
-
-        self.logger.info(f"writting {balances=}")
 
     def update_positions(self, positions: Dict[str, list]) -> None:
         positions_path = f"{self.path}position.csv"
@@ -67,9 +77,6 @@ class Writer(WriterBase):
                 writer.writeheader()
                 for row in zip(*positions.values()):
                     writer.writerow(dict(zip(positions.keys(), row)))
-
-        self.logger.info(f"writting {positions=}")
-
 
 if __name__ == '__main__':
     from getpass import getpass
