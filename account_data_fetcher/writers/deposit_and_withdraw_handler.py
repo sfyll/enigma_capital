@@ -15,12 +15,10 @@ class DepositAndWithdraw:
     amount: float
     comment: Optional[str]
 
-    def write_dataclass_to_csv(self, file_name:str) -> None:
+    def write_dataclass_to_csv(self, path: str) -> None:
         dict_obj = asdict(self)
-        path = os.path.realpath(os.path.dirname(__file__))
-        file_exists = self.is_file_in_folder(path, file_name)
-        file_name: str = path + "/" + file_name
-        with open(file_name, 'a', newline='') as csvfile:
+        file_exists = self.is_file_in_folder(path)
+        with open(path, 'a', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=dict_obj.keys())
             if not file_exists:
                 writer.writeheader()
@@ -36,7 +34,12 @@ class depositAndWithdrawHandler:
     def __init__(self) -> None:
         print(f"We will now prompt you some information so that your deposit and withdraw can be handled. \n Please note the list of supported exchange is the following {self.__SUPPORTED_EXCHANGE}")
         self.data: DepositAndWithdraw = self.__get_data()
-        self.data.write_dataclass_to_csv("deposits_and_withdraws.csv")
+        self.data.write_dataclass_to_csv(self.get_base_path() + "/account_data_fetcher/csv_db/deposits_and_withdraws.csv")
+
+    @staticmethod
+    def get_base_path():
+        current_directory = os.path.dirname(__file__)
+        return os.path.abspath(os.path.join(current_directory, '..', '..'))
         
     def __get_data(self) -> DepositAndWithdraw:
         return DepositAndWithdraw(
