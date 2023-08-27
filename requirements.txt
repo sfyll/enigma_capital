@@ -15,3 +15,4 @@ ecdsa==0.18.0
 mpmath==1.2.1
 sympy==1.11.1
 tabulate==0.9.0
+zmq=0.0.0
