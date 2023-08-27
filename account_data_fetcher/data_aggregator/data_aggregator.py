@@ -73,15 +73,16 @@ class AggregatedData:
         if set(self.exchanges.keys()) != set(self.data_routes.fetcher_routes.keys()):
             return False
 
-        #if aggregation interval == 24h, check that we've got a new day taking into account IB timezone
+        #if aggregation interval == 24h, we're assuming we want to post on new day as defined by IB
         if self.aggregation_interval == 86400 and not self.__is_new_day():
             return False
-        
-        oldest_fetch_timestamp = min(
-            exchange.last_fetch_timestamp for exchange in self.exchanges.values()
-        )
 
-        return time.time() - oldest_fetch_timestamp >= self.aggregation_interval
+        else:
+            oldest_fetch_timestamp = min(
+                exchange.last_fetch_timestamp for exchange in self.exchanges.values()
+            )
+
+            return time.time() - oldest_fetch_timestamp >= self.aggregation_interval
 
     def __is_new_day(self, offset: int = -5):
         local_tz = pytz.timezone('Etc/GMT+5')  # Adjusting for -5h offset
