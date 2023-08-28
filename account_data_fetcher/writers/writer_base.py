@@ -37,14 +37,14 @@ class WriterBase(ABC):
         pass
 
     def process_request(self):
-        context = zmq.Context()
-        sub_socket = context.socket(zmq.SUB)
-        self.logger.debug(f"Subscribing {self.writer} to tcp://localhost:{self.data_aggregator_port_number}")
-        sub_socket.connect(f"tcp://localhost:{self.data_aggregator_port_number}") # Assuming middleman is running on the same host
-        """TODO:
-            Handle subscription on per topic basis"""
-        sub_socket.setsockopt_string(zmq.SUBSCRIBE, "")
         try:
+            context = zmq.Context()
+            sub_socket = context.socket(zmq.SUB)
+            self.logger.debug(f"Subscribing {self.writer} to tcp://localhost:{self.data_aggregator_port_number}")
+            sub_socket.connect(f"tcp://localhost:{self.data_aggregator_port_number}") # Assuming middleman is running on the same host
+            """TODO:
+                Handle subscription on per topic basis"""
+            sub_socket.setsockopt_string(zmq.SUBSCRIBE, "")
             while True:
                 _, data = sub_socket.recv_multipart()
                 self.logger.debug(f"Writer received {data}")

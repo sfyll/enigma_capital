@@ -31,12 +31,12 @@ class ExchangeBase(ABC):
         pass
 
     def process_request(self):
-        context = zmq.Context()
-        socket = context.socket(zmq.PUB)
-        self.logger.debug(f"Publishing {self.exchange=} content to tcp://*:{self.port_number}")
-        socket.bind(f"tcp://*:{self.port_number}")
-
         try:
+            context = zmq.Context()
+            socket = context.socket(zmq.PUB)
+            self.logger.debug(f"Publishing {self.exchange=} content to tcp://*:{self.port_number}")
+            socket.bind(f"tcp://*:{self.port_number}")
+
             while True:
                 # Fetch balance and positions
                 balance_data = self.fetch_balance()
