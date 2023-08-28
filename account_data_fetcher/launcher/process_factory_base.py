@@ -8,8 +8,9 @@ from infrastructure.log_handler import fetch_logging_config
 class ProcessFactoryBase(ABC):
     logger = None
     def __init__(self):
-        ProcessFactoryBase.logger = self.init_logging()  
-
+        self.logger = self.init_logging()
+        ProcessFactoryBase.logger = self.logger 
+    
     @staticmethod
     def init_logging(self):
         fetch_logging_config('/account_data_fetcher/config/logging_config.ini')
