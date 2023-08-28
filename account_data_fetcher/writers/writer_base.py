@@ -44,14 +44,16 @@ class WriterBase(ABC):
         """TODO:
             Handle subscription on per topic basis"""
         sub_socket.setsockopt_string(zmq.SUBSCRIBE, "")
+        try:
+            while True:
+                _, data = sub_socket.recv_multipart()
+                self.logger.debug(f"Writer received {data}")
+                
+                balance_and_positions_dict = json.loads(data.decode())
 
-        while True:
-            _, data = sub_socket.recv_multipart()
-            self.logger.debug(f"Writer received {data}")
-            
-            balance_and_positions_dict = json.loads(data.decode())
+                self.logger.debug(f"writing {balance_and_positions_dict=}")
 
-            self.logger.debug(f"writing {balance_and_positions_dict=}")
-
-            self.update_balances(balance_and_positions_dict["balance"])
-            self.update_positions(balance_and_positions_dict["positions"])
+                self.update_balances(balance_and_positions_dict["balance"])
+                self.update_positions(balance_and_positions_dict["positions"])
+        except Exception as e:
+            self.logger.info(f"{e=}", exc_info=True)

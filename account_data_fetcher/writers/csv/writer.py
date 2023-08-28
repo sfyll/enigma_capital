@@ -51,7 +51,7 @@ class Writer(WriterBase):
                     writer = DictWriter(csvfile, fieldnames=balances.keys())
                     writer.writerow(balances)
                     
-        except FileNotFoundError:
+        except pd.errors.EmptyDataError:
             pd.DataFrame([balances]).set_index("date").to_csv(balance_path)
 
     def update_positions(self, positions: Dict[str, list]) -> None:

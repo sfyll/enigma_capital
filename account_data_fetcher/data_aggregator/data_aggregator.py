@@ -60,9 +60,9 @@ class ExchangeData:
 @dataclass
 class AggregatedData:
     aggregation_interval: int
-    date: str
     data_routes: DataAggregatorConfig
     netliq: float = 0
+    date: str = None
     exchanges: Dict[str, ExchangeData] = field(default_factory=dict)
 
     def get_object_if_ready(self) -> Optional[dict]:
@@ -70,12 +70,16 @@ class AggregatedData:
             return self.__get_object_to_send()
 
     def __can_send(self) -> bool:
-        if set(self.exchanges.keys()) != set(self.data_routes.fetcher_routes.keys()):
+        if set(self.data_routes.fetcher_routes.keys()) <= set(self.exchanges.keys()) :
+            pass
+        else:
             return False
 
         #if aggregation interval == 24h, we're assuming we want to post on new day as defined by IB
         if self.aggregation_interval == 86400:
-            if self.__is_new_day():
+            if not self.__is_new_day():
+                return False
+            else:
                 return True
 
         else:
@@ -83,17 +87,15 @@ class AggregatedData:
                 exchange.last_fetch_timestamp for exchange in self.exchanges.values()
             )
 
-            return time.time() - oldest_fetch_timestamp >= self.aggregation_interval
+            return time.time() - oldest_fetch_timestamp >= self.aggregation_interval    
 
-    def __is_new_day(self, offset: int = -5):
-        local_tz = pytz.timezone('Etc/GMT+5')  # Adjusting for -5h offset
-        utc_time = pytz.utc.localize(datetime.utcnow())
-        local_time = utc_time.astimezone(local_tz)
-
-        if local_time.hour < 5:  # Wait until 5 AM local time
+    def __is_new_day(self) -> bool:
+        utc_time = datetime.utcnow()
+        
+        if utc_time.hour < 6:  # Wait until 7 AM UTC
             return False
 
-        current_date = local_time.date()
+        current_date = utc_time.date()
         last_sent_date = datetime.strptime(self.date, "%Y-%m-%d %H:%M:%S").date() if self.date else None
 
         return current_date != last_sent_date

@@ -6,15 +6,6 @@ import logging
 from infrastructure.log_handler import fetch_logging_config
 
 class ProcessFactoryBase(ABC):
-    logger = None
-    def __init__(self):
-        self.logger = self.init_logging()
-        ProcessFactoryBase.logger = self.logger 
-    
-    @staticmethod
-    def init_logging(self):
-        fetch_logging_config('/account_data_fetcher/config/logging_config.ini')
-        return logging.getLogger(__name__)
 
     @classmethod
     def get_process_class(cls, process_name: str):
@@ -41,11 +32,7 @@ class ProcessFactoryBase(ABC):
         
         launched_instance = process_instance(*args, **filtered_kwargs)
 
-
-        try:
-            launched_instance.process_request()
-        except Exception as e:
-            cls.logger.info(f"{e=}", exc_info=True)
+        launched_instance.process_request()
 
     """the below is the CLI parser
        refer to an implementation for details"""

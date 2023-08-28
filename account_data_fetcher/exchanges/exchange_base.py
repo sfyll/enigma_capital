@@ -36,20 +36,23 @@ class ExchangeBase(ABC):
         self.logger.debug(f"Publishing {self.exchange=} content to tcp://*:{self.port_number}")
         socket.bind(f"tcp://*:{self.port_number}")
 
-        while True:
-            # Fetch balance and positions
-            balance_data = self.fetch_balance()
-            positions_data = self.fetch_positions()
+        try:
+            while True:
+                # Fetch balance and positions
+                balance_data = self.fetch_balance()
+                positions_data = self.fetch_positions()
 
-            msg: dict = {
-                "exchange": self.exchange,
-                "balance": balance_data,
-                "positions": positions_data 
-            }
+                msg: dict = {
+                    "exchange": self.exchange,
+                    "balance": balance_data,
+                    "positions": positions_data 
+                }
 
-            self.logger.debug(f"Sending {self.exchange}: {msg=}")
+                self.logger.debug(f"Sending {self.exchange}: {msg=}")
 
-            socket.send_multipart([b"balance_and_positions", json.dumps(msg).encode()])
+                socket.send_multipart([b"balance_and_positions", json.dumps(msg).encode()])
 
-            # Sleep or wait for a signal to fetch the next data
-            time.sleep(self.fetch_frequency) # 1 hours
+                # Sleep or wait for a signal to fetch the next data
+                time.sleep(self.fetch_frequency) # 1 hours
+        except Exception as e:
+            self.logger.info(f"{e=}", exc_info=True)
