@@ -4,14 +4,13 @@ from typing import Optional
 
 import telegram
 
-from utilities.account_data_fetcher_base import accountFetcherBase
+from infrastructure.api_secret_getter import ApiSecretGetter, ApiMetaData
 
-class telegramHandler(accountFetcherBase):
-    __PROGRAM = "Telegram"
+class telegramHandler:
     def __init__(self, path: str, password: str) -> None:
-        super().__init__(path, password)
-        self.bot: telegram.Bot = telegram.Bot(self.api_meta_data[self.__PROGRAM].key)
-        self.channel_id: str = "-" +  self.api_meta_data[self.__PROGRAM].other_fields["Channel_id"]
+        secrets: ApiMetaData = ApiSecretGetter.get_api_meta_data(path, password)
+        self.bot: telegram.Bot = telegram.Bot(secrets.key)
+        self.channel_id: str = "-" +  secrets.other_fields["Channel_id"]
 
     async def send_photo_to_telegram(self, file_path: str) -> None:
         return await self.bot.send_photo(
