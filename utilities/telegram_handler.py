@@ -1,16 +1,17 @@
 import logging
 import os
-from typing import Optional
+from typing import Dict, Optional
 
 import telegram
 
 from infrastructure.api_secret_getter import ApiSecretGetter, ApiMetaData
 
 class telegramHandler:
+    __PROGRAM="Telegram"
     def __init__(self, path: str, password: str) -> None:
-        secrets: ApiMetaData = ApiSecretGetter.get_api_meta_data(path, password)
-        self.bot: telegram.Bot = telegram.Bot(secrets.key)
-        self.channel_id: str = "-" +  secrets.other_fields["Channel_id"]
+        secrets: Dict[str, ApiMetaData] = ApiSecretGetter.get_api_meta_data(path, password)
+        self.bot: telegram.Bot = telegram.Bot(secrets[self.__PROGRAM].key)
+        self.channel_id: str = "-" +  secrets[self.__PROGRAM].other_fields["Channel_id"]
 
     async def send_photo_to_telegram(self, file_path: str) -> None:
         return await self.bot.send_photo(
