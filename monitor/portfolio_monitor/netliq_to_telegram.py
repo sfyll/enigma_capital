@@ -26,7 +26,7 @@ class netliqToTelgram(telegramHandler):
 
     def get_netliq_path(self, current_path) -> str:
         self.base = os.path.dirname(os.path.dirname(current_path))
-        return self.base + '/account_data_fetcher/csv_db/balances.csv'
+        return self.base + '/account_data_fetcher/csv_db/balance.csv'
 
     async def send_yesterday(self) -> None:
         df = pd.read_csv(self.netliq_path)
