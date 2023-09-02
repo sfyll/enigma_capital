@@ -8,7 +8,7 @@ Enigma Capital observes two use-cases. It functions as both a [Financial Assista
 
 ### A Financial Assistant:
 
-This repository allows you to run your finances in the background,freeing you to do _anything_ else. Current features include:
+This repository allows you to run your finances in the background, freeing you to do _anything_ else. Current features include:
 
 - Monitoring and saving your positions and balances across crypto and traditional exchanges;
 - Conducting analysis on collected data;
@@ -44,7 +44,7 @@ Adding new components is straightforward—simply extend the existing base class
 ```bash
 sudo pip install virtualenv
 ```
-2. **Clone the repo or a fork of it**:
+2. **Clone the repo or a fork of it**
 3. **Navigate to the base repo directory and run**:
 ```bash
 virtualenv env
@@ -90,7 +90,7 @@ You may need to make the script executable first:
 ```bash
 chmod+x scriptname.sh
 ```
-Run the scripts. To move them to the background after entering your password, press `CTRL+z`, then run `bg`. disown if needed.
+Run the scripts. To move them to the background after entering your password, press `CTRL+z`, then run `bg`. `disown` if needed.
 
 ---
 
