@@ -82,3 +82,18 @@ Make the project root an environment variable equal to enigma, for ex with zsh s
 Keep in mind you'll have to make changes to ibflex as library is not updated, from lines 263 in their Types document, use diff checker and their main repo to make this easier!
 
 All set and ready to go !
+
+ 
+ ## TODOs
+- Be able to subscribe to different topics, so that the data_aggregator can scale easily to more usecases ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/account_data_fetcher/data_aggregator/data_aggregator.py#L286))
+- Handle failure. What if an exchange stop publishing and we just loop forever? ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/account_data_fetcher/data_aggregator/data_aggregator.py#L291))
+- Make the function more modular, the data_aggregator should be agnostic to what data is being aggregated as that should be abstracted away. ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/account_data_fetcher/data_aggregator/data_aggregator.py#L292))
+- Properly parse the object below so that the inner dataclass can be read as a dataclass, and not accessed as a dict ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/account_data_fetcher/data_aggregator/data_aggregator.py#L318))
+- For now, we only enforce two methods implementation, namely fetch_balance and fetch_positions. As such, process_request is quite statically defined as well. How could we untangle both so that we can define more abstract methods and have the process_request understands what to fetch dynamically. ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/account_data_fetcher/exchanges/exchange_base.py#L12))
+- Batch calls via multicall contracts + use helios lightweight client (need to fix eth_call loops, broken atm) ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/account_data_fetcher/exchanges/ethereum/data_fetcher.py#L42))
+- Fetch positions ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/account_data_fetcher/exchanges/ib_async/data_fetcher.py#L49))
+- Fix arbitrary ConnectionResetError bug requests.exceptions.ConnectionError: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer')) ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/account_data_fetcher/exchanges/dydx/data_fetcher.py#L65))
+- Handle subscription on per topic basis ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/account_data_fetcher/writers/writer_base.py#L100))
+- For the bravest, automate the below by listening to withdraw/deposits for each exchanges and updating the database as needed. ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/account_data_fetcher/writers/deposit_and_withdraw_handler.py#L58))
+- Process request is the only entry-point at the factory level. This could be made more generic to accomodate for other entry-points and inputs as the application scales. ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/account_data_fetcher/launcher/process_factory_base.py#L43))
+- Take a look at account_data_fetcher, how could you refactor the entire monitor component? ([source](https://github.com/SFYLL/enigma_capital/blob/make_it_better/monitor/runner.py#L20))
