@@ -222,7 +222,8 @@ class AggregatedData:
                 to_send_object["positions"][key].extend(value.position.data[key])
 
         return to_send_object
-    
+
+#TODO: Only localhost is supported for components communication. Allow support for other hosts!
 class DataAggregator:
     """Main class for aggregating data from multiple exchanges and publishing it to the writers.
 
