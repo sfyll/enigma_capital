@@ -6,7 +6,8 @@ import subprocess
 todos = {}
 current_branch = subprocess.getoutput('git symbolic-ref --short HEAD').strip()
 remote_url = subprocess.getoutput('git config --get remote.origin.url').strip()
-print(remote_url)
+print(f"{remote_url=}")
+print(f"{remote_url.split(':')[1].replace('.git', '').split('/')=}")
 username, repo_name = remote_url.split(':')[1].replace('.git', '').split('/')
 print(f"{current_branch=}")
 print(f"{remote_url=}")
