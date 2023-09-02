@@ -14,10 +14,27 @@ class ProcessFactory(ProcessFactoryBase):
 
     @classmethod
     def get_module_name(cls, process_name):
+        """
+        Gets the module name for a given process name.
+
+        Args:
+            process_name (str): Name of the process.
+            
+        Returns:
+            str: The full module name.
+        """
         return f"{cls.__FILE_PREFIX}.{process_name.lower()}.{cls.__STANDARDIZED_FILE_NAME}"
 
     @classmethod
     def main(cls):
+        """
+        Main method to launch the CLI parser and execute the process.
+
+        Note:
+            Uses argparse for parsing CLI arguments. Deserializes JSON strings to dicts.
+            Converts the dictionary to SecretsDataClass and replaces in kwargs_dict.
+            Arguments of interest will get picked-up in launch_process_and_run_request_processor().
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("--exchange_name", required=True)
         parser.add_argument("--args", default="{}")
