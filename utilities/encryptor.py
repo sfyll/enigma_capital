@@ -12,7 +12,7 @@ SymmetricKeyAlgorithm, CompressionAlgorithm)
 from cryptography.utils import CryptographyDeprecationWarning
 warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning) 
 
-
+#TODO: Maybe at this stage, the below should be a class instead of a serie of functions. One could also say it could be part of infrastructure/.
 def pgpy_encrypt(key, data):
     message = pgpy.PGPMessage.new(data)
     enc_message = key.pubkey.encrypt(message)
