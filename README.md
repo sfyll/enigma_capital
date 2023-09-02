@@ -1,4 +1,4 @@
-# UnNamed-Fund - The Modern Intelligent Investor
+# UnNamed-Fund - The Modern Intelligent Investor 
 
 - Monitor your positions and balances across crypto and traditional exchanges;
 - Save the above to build a track-record and run statistical analysis, with google sheets being used as back-up;
