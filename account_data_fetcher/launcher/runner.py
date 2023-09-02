@@ -14,24 +14,39 @@ from infrastructure.api_secret_getter import ApiSecretGetter
 
 class Runner(RunnerBase):
         def __init__(self, pwd: str, logger: Optional[Logger] = None):
+            """
+            Initializes the Runner class.
+
+            Args:
+                pwd (str): The password for authentication.
+                logger (Optional[Logger]): Logger for logging info. Defaults to None.
+            """
             super().__init__(logger)
             self.port_per_process, self.secrets_per_process = self.outer_set_input_builder(pwd)
 
         @staticmethod
         def get_lower_case_list_elements(list_elements: List[str]) -> List[str]:
+            """
+            Converts all elements in the list to lowercase.
+
+            Args:
+                list_elements (List[str]): List of strings to convert.
+
+            Returns:
+                List[str]: List of lowercased strings.
+            """
             return [x.lower() for x in list_elements]
 
-        """Build Inputs for all exchanges, and cherry-pick at the factory level. For now only handles non defaulting inputs
-           Inputs Needed:
-                secrets: ApiMetaData, 
-                port_number: int, 
-                sub_account_name: Optional[str] = None
-                delta_in_seconds_allowed: int = 30
-                app= GATEWAY,
-                paper_trading = False,
-                cache_state = True, 
-                refresh_enabled = True"""
         def outer_set_input_builder(self, pwd: str) -> Tuple[dict, dict]:
+            """
+            Builds inputs for all exchanges and cherry-picks at the factory level.
+
+            Args:
+                pwd (str): The password for decryption.
+
+            Returns:
+                Tuple[dict, dict]: Port numbers and secrets for each process.
+            """
             port_per_process = self.get_port_number_pairings()
             
             secrets_per_process = self.get_secrets(pwd)
@@ -41,6 +56,15 @@ class Runner(RunnerBase):
                     )
 
         def get_secrets(self, pwd: str) -> dict:
+            """
+            Fetches API secrets.
+
+            Args:
+                pwd (str): The password for authentication.
+
+            Returns:
+                dict: Dictionary containing secrets.
+            """
             path = self.base_path + "/account_data_fetcher/secrets/"
             
             secrets: dict = ApiSecretGetter.get_api_meta_data(path, pwd)
@@ -50,6 +74,15 @@ class Runner(RunnerBase):
             return secrets
             
         def launch_processes(self, pwd: str, process_type: str, process_names: List[str], factory_prefix: str) -> None:
+            """
+            Launches specified processes by calling the factory implementation.
+
+            Args:
+                pwd (str): The password for decryption.
+                process_type (str): Type of the process to launch.
+                process_names (List[str]): Names of the processes.
+                factory_prefix (str): Prefix for the process factory.
+            """
             process_names = self.get_lower_case_list_elements(process_names)
             
             for process_name in process_names:
@@ -82,6 +115,15 @@ class Runner(RunnerBase):
             self.logger.info(f"All {process_type} processes started. Exiting Runner Process.")
 
         def launch_data_aggregator(self, process_name: str, time_interval: int, exchanges: List[str], writers: List[str]) -> None:
+            """
+            Launches the data aggregator process.
+
+            Args:
+                process_name (str): Name of the data aggregator process.
+                time_interval (int): Time interval for aggregation.
+                exchanges (List[str]): List of exchanges for data fetch.
+                writers (List[str]): List of writers for data output.
+            """
             exchanges, writers = self.get_lower_case_list_elements(exchanges), self.get_lower_case_list_elements(writers)
             exchange_subscriptions: Dict[str, int] = {
                 "ib" if k in ["ib_flex", "ib_async"] else k: Subscription(port_number=self.port_per_process[k])
@@ -110,8 +152,12 @@ class Runner(RunnerBase):
             self.logger.info(f"Started process for {process_name} with PID {process.pid}")
 
         def get_port_number_pairings(self) -> list:
-            """FORMAT OF meta_data.json:
-            {"addresses": [] }"""
+            """
+            Fetches port number pairings from a JSON file.
+
+            Returns:
+                list: List of port number pairings.
+            """
 
             path = self.base_path + "/account_data_fetcher/config/port_number_pairing.json"
 

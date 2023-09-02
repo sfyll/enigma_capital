@@ -1,15 +1,23 @@
 from abc import ABC, abstractmethod
 from importlib import import_module
 import inspect
-import logging
-
-from infrastructure.log_handler import fetch_logging_config
 
 class ProcessFactoryBase(ABC):
 
     @classmethod
     def get_process_class(cls, process_name: str):
-        
+        """
+        Retrieves the class object for a given process name.
+
+        Args:
+            process_name (str): Name of the process.
+            
+        Returns:
+            Class: The class object corresponding to the process name.
+
+        Raises:
+            Exception: If importing the module or getting the attribute fails.
+        """
         module_name = cls.get_module_name(process_name)
         
         try:
@@ -21,10 +29,28 @@ class ProcessFactoryBase(ABC):
     @classmethod
     @abstractmethod
     def get_module_name(cls, process_name) -> str:
+        """
+        Abstract method to get the module name for a given process name.
+
+        Args:
+            process_name (str): Name of the process.
+            
+        Returns:
+            str: The module name.
+        """
         pass
 
+    #TODO: Process request is the only entry-point at the factory level. This could be made more generic to accomodate for other entry-points and inputs as the application scales.
     @classmethod
     def launch_process_and_run_request_processor(cls, process_name: str, *args, **kwargs) -> None:
+        """
+        Instantiates the process class and runs its request processor method.
+
+        Args:
+            process_name (str): Name of the process.
+            *args: Variable-length argument list.
+            **kwargs: Arbitrary keyword arguments.
+        """
         process_instance = cls.get_process_class(process_name)
 
         signature = inspect.signature(process_instance.__init__)
@@ -34,9 +60,10 @@ class ProcessFactoryBase(ABC):
 
         launched_instance.process_request()
 
-    """the below is the CLI parser
-       refer to an implementation for details"""
     @classmethod
     @abstractmethod
     def main(cls):
+        """
+        Abstract method for the main CLI parser implementation. Refer to an implementation for enlightening examples.
+        """
         pass
