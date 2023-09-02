@@ -6,6 +6,9 @@ on:
       - '**' # any feature branches you may use
     workflow_dispatch:
 
+env:
+    PYTHONUNBUFFERED: "1"
+
 jobs:
   update:
     runs-on: ubuntu-latest
