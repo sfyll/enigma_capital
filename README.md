@@ -1,28 +1,42 @@
-# UnNamed-Fund - The Modern Intelligent Investor 
+# Enigma Capital - The Modern Intelligent Investor
 
-- Monitor your positions and balances across crypto and traditional exchanges;
-- Save the above to build a track-record and run statistical analysis, with google sheets being used as back-up;
+**A modular financial secretary: run your investments in the background.**
+
+## What is Enigma Capital?
+
+Enigma Capital observes two use-cases. You can use it as an out-of-the-box [financial assistant](#a-financial-assistant) or [developer skills honer](#a-contributor-friendly-developer-skills-honer).
+
+### A Financial Assistant:
+
+This repository allows you to run your finances in the background so that you can spend your time doing _anything_ else. For now, it supports the following:
+
+- Monitor and save your positions and balances across crypto and traditional exchanges;
+- Run analysis on monitored/saved data;
+- Build a track-record;
 - Quantify your thesis, create dashboards and have these sent to the Telegram channel of your choice.
 
-All in all, use this repo to invest smarter and better, less is more!
+<details>
+  <summary><strong>Supported Exchanges</strong></summary>
 
-## Supported Exchanges:
+  - Binance;
+  - Bybit;
+  - DYDX; 
+  - Ethereum; 
+  - Interactive Brokers; 
+  - TradeStation;
+  - FTX (LoL);
+  - Kraken;
+  - RootStock;
 
-- Binance;
-- Bybit;
-- DYDX; 
-- Ethereum; 
-- Interactive Brokers; 
-- TradeStation;
+</details>
 
-Please note this is for basic usage. I quickly built up this repo and so it's not complete by any means, for example:
+### A contributor-friendly, developer skills honer:
 
-- If latency matters, don't use it;
-- If you're planning to fetch your balances across 30 ERC20s, don't use it;
+The [account data fetcher](./account_data_fetcher/) was implemented following a modular architecture:
 
-My goal with this code was to save time going forward, not to make money. Nonetheless, any contribution is always appreciated as they are quite a few low hanging fruits!
+![Infrastructure](./readme_public/infrastructure_github.svg)
 
-PS: You'll find what I meant by dashboard by being able to run the code in `/thesis_monitoring/hkd_peg_breaking/` !
+As such, it is trivial from the Enigma Capital side to add lego pieces if they just extend the base classes. To add-on over this educational property, the codebase has been filled with verbose, Google-style for docstring formatting, comments. Finally, it is filled with [Todos](#todos) to guide you if you don't know where to start contributing !
 
 ## Installation
 
