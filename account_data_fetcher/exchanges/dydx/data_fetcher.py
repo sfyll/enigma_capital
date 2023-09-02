@@ -62,8 +62,7 @@ class marginRequirements:
     maintenanceMarginRequirements: float
 
 
-"""TODO: Fix arbitrary ConnectionResetError bug
-    requests.exceptions.ConnectionError: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))"""
+#TODO: Fix arbitrary ConnectionResetError bug requests.exceptions.ConnectionError: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))
 class DataFetcher(ExchangeBase):
     _EXCHANGE = "DYDX"
     def __init__(self, secrets: ApiMetaData, port_number: int) -> None:
