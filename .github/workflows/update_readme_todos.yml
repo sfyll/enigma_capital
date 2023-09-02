@@ -7,7 +7,8 @@ on:
     workflow_dispatch:
 
 env:
-    PYTHONUNBUFFERED: "1"
+    BRANCH_NAME: ${{ github.ref_name }}
+    REPO_FULL_NAME: ${{ github.repository }}
 
 jobs:
   update:

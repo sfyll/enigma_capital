@@ -4,13 +4,19 @@ import subprocess
 
 # TODO Extraction
 todos = {}
-current_branch = subprocess.getoutput('git symbolic-ref --short HEAD').strip()
-remote_url = subprocess.getoutput('git config --get remote.origin.url').strip()
-print(f"{remote_url=}")
-print(f"{remote_url.split(':')[1].replace('.git', '').split('/')=}")
-username, repo_name = remote_url.split(':')[1].replace('.git', '').split('/')
-print(f"{current_branch=}")
-print(f"{remote_url=}")
+try:
+    current_branch = subprocess.getoutput('git symbolic-ref --short HEAD').strip()
+    remote_url = subprocess.getoutput('git config --get remote.origin.url').strip()
+    username, repo_name = remote_url.split(':')[1].replace('.git', '').split('/')
+except Exception as e:
+    print(f"Local git commands failed: {e}")
+    print("Assuming script is running in GitHub Actions...")
+    current_branch = os.environ.get('BRANCH_NAME')
+    print(f"{current_branch=}")
+    repo_full_name = os.environ.get('REPO_FULL_NAME')
+    print(f"{repo_full_name=}")
+    username, repo_name = repo_full_name.split('/')
+
 for root, _, files in os.walk("."):
     if root.startswith(("./account_data_fetcher" , "./monitor")):
         if root.startswith("./account_data_fetcher/dependencies/"):
