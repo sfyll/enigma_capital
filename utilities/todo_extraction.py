@@ -13,9 +13,8 @@ except Exception as e:
     print("Assuming script is running in GitHub Actions...")
     current_branch = os.environ.get('BRANCH_NAME')
     print(f"{current_branch=}")
-    repo_full_name = os.environ.get('REPO_FULL_NAME')
-    print(f"{repo_full_name=}")
-    username, repo_name = repo_full_name.split('/')
+    repo_name = os.environ.get('REPO_FULL_NAME').split('/')[1]
+    print(f"{repo_name=}")
 
 for root, _, files in os.walk("."):
     if root.startswith(("./account_data_fetcher" , "./monitor")):
@@ -27,7 +26,7 @@ for root, _, files in os.walk("."):
                     for i, line in enumerate(f.readlines()):
                         matches = re.findall(r"#TODO\s*: (.+)$", line)
                         for match in matches:
-                            todos[f"https://github.com/{username}/{repo_name}/blob/{current_branch}/{root[2:]}/{filename}#L{i+1}"] = match
+                            todos[f"https://github.com/SFYLL/{repo_name}/blob/{current_branch}/{root[2:]}/{filename}#L{i+1}"] = match
 
 # Markdown Generation
 md_content = "\n \n ## TODOs\n"
