@@ -4,6 +4,7 @@ env/
 __pycache__/
 .api_enc.txt
 .pk.txt
+*.tldr
 pyrightconfig.json
 *.png
 /monitor/*
