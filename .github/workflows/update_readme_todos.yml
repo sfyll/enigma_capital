@@ -10,6 +10,9 @@ env:
     BRANCH_NAME: ${{ github.ref_name }}
     REPO_FULL_NAME: ${{ github.repository }}
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
+permissions:
+  contents: write
 
 jobs:
   update:
