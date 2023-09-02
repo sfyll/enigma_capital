@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - 'feature/**' # any feature branches you may use
+    workflow_dispatch:
 
 jobs:
   update:
