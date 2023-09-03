@@ -2,10 +2,10 @@
 env/
 .DS_Store
 __pycache__/
-*.csv
 .api_enc.txt
 .pk.txt
-*.json
+*.tldr
+pyrightconfig.json
 *.png
 /monitor/*
 !monitor/hkd_peg_breaking/

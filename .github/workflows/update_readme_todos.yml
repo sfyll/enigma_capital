@@ -1,0 +1,40 @@
+name: Update README TODOS
+
+on:
+  push:
+    branches:
+      - '**' # any feature branches you may use
+    workflow_dispatch:
+
+env:
+    BRANCH_NAME: ${{ github.ref_name }}
+    REPO_FULL_NAME: ${{ github.repository }}
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          token: ${{ env.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      
+      - name: Run the script
+        run: python utilities/todo_extraction.py
+      
+      - name: Commit changes
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add -A
+          git commit -m "Automatically update README with TODOs" || echo "No changes to commit"
+          git push

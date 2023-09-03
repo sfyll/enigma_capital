@@ -17,6 +17,7 @@ try:
 except (FileNotFoundError, ModuleNotFoundError):
     pass #hidden thesis, should it be?
     
+#TODO: Take a look at account_data_fetcher, how could you refactor the entire monitor component?
 class Runner:
         def __init__(self, logger: Optional[logging.Logger] = None) -> None:
             self.logger = logging.getLogger(__name__) if not logger else logger

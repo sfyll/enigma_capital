@@ -12,7 +12,7 @@ SymmetricKeyAlgorithm, CompressionAlgorithm)
 from cryptography.utils import CryptographyDeprecationWarning
 warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning) 
 
-
+#TODO: Maybe at this stage, the below should be a class instead of a serie of functions. One could also say it could be part of infrastructure/.
 def pgpy_encrypt(key, data):
     message = pgpy.PGPMessage.new(data)
     enc_message = key.pubkey.encrypt(message)
@@ -104,11 +104,20 @@ def modify_existing_key_in_encrypted_file(path: str, exchange: str, pwd: str, ke
     with key.unlock(pwd):
         decrypted = pgpy_decrypt(key, current_encrypted_data).replace('\'', '\"')
         data = json.loads(decrypted)
+        if exchange not in data:
+            raise KeyError
         data[exchange] = key_information
         encrypted = pgpy_encrypt(key, str(data))
     write_api_key_enc_to_file(path, encrypted)
 
-
+def modify_key_name_in_encrypted_file(path: str, old_exchange_name: str, new_exchange_name: str, pwd: str, key):
+    current_encrypted_data = get_encrypted_meta_data(path)
+    with key.unlock(pwd):
+        decrypted = pgpy_decrypt(key, current_encrypted_data).replace('\'', '\"')
+        data = json.loads(decrypted)
+        data[new_exchange_name] = data.pop(old_exchange_name)
+        encrypted = pgpy_encrypt(key, str(data))
+    write_api_key_enc_to_file(path, encrypted)
 
 if __name__ == '__main__':
     pwd = getpass("provide password for pk:")

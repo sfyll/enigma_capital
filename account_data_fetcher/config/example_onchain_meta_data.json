@@ -1,0 +1,6 @@
+{"addresses_per_chain": {
+    "Ethereum":
+        ["address1", "address2"],
+    "RSK":
+        ["address3"]}
+}
