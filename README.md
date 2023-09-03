@@ -1,6 +1,6 @@
 # Enigma Capital - The Modern Intelligent Investor
 
-**A modular financial secretary: run your investments in the background.**
+**A modular financial assistant: run your investments in the background.**
 
 ## What is Enigma Capital?
 
