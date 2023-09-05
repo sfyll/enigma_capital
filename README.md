@@ -159,3 +159,4 @@ echo 'export ENIGMA=~/Documents/dev/enigma_capital ' >> ~/.zshenv`
 - For the bravest, automate the below by listening to withdraw/deposits for each exchanges and updating the database as needed. ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/writers/deposit_and_withdraw_handler.py#L58))
 - Process request is the only entry-point at the factory level. This could be made more generic to accomodate for other entry-points and inputs as the application scales. ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/launcher/process_factory_base.py#L43))
 - Take a look at account_data_fetcher, how could you refactor the entire monitor component? ([source](https://github.com/SFYLL/enigma_capital/blob/master/monitor/runner.py#L20))
+- Format for phone recipient ! ([source](https://github.com/SFYLL/enigma_capital/blob/master/monitor/portfolio_monitor/netliq_to_telegram.py#L12))
