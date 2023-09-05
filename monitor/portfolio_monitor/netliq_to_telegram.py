@@ -43,20 +43,26 @@ class netliqToTelgram(telegramHandler):
         df_pct_change = df.iloc[:, 1:].apply(self.custom_pct_change)
         df = pd.concat([df, df_pct_change.add_suffix('_pct')], axis=1)
         
-        last_line_df = df.tail(1).applymap(self.format_value)
+        last_line_df = df.tail(1)
         last_row_nav = last_line_df.iloc[:, :total_columns_len].T
         pct_change_values = last_line_df.iloc[:, total_columns_len:].T
 
         structured_df = pd.DataFrame({
             'Val': self.to_single_list(last_row_nav.values),
-            'PctChg': [last_line_df.iloc[0, 0]] + self.to_single_list(pct_change_values.values)
+            'Chg': [last_line_df.iloc[0, 0]] + self.to_single_list(pct_change_values.values)
         }, index=last_row_nav.index.values)
 
         if 'date' in structured_df.index:
             original_date_str = structured_df.loc['date', 'Val']
-            formatted_date = datetime.strptime(original_date_str, '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%y')
+            formatted_date = datetime.strptime(original_date_str, '%Y-%m-%d %H:%M:%S').strftime('%d/%m')
             structured_df.loc['date', 'Val'] = formatted_date
-            structured_df.loc['date', 'PctChg'] = formatted_date
+            structured_df.loc['date', 'Chg'] = formatted_date
+
+
+        structured_df['Chg'] = structured_df['Chg'].apply(self.format_value_to_pct)
+        structured_df['Val'] = structured_df['Val'].apply(self.format_value_to_thousands)
+
+        print(structured_df)
 
         return structured_df
 
@@ -70,8 +76,12 @@ class netliqToTelgram(telegramHandler):
         return [item for sublist in value for item in sublist]
 
     @staticmethod
-    def format_value(value):
-            return "{:,.2f}".format(value) if isinstance(value, float) else str(value)
+    def format_value_to_pct(value):
+            return "{:,.0f}%".format(value) if isinstance(value, float) else str(value)
+    
+    @staticmethod
+    def format_value_to_thousands(value):
+        return "{:,.0f}K".format(value / 1000) if isinstance(value, float) else str(value)
 
 
 if __name__ == "__main__":
