@@ -24,6 +24,14 @@ class AccountMetaData:
     TodaysProfitLoss: float
     UnclearedDeposit: float
 
+    def reset(self):
+        self.CashBalance = 0.0
+        self.Equity = 0.0
+        self.MarketValue = 0.0
+        self.TodaysProfitLoss = 0.0
+        self.UnclearedDeposit = 0.0
+        return self
+
 """https://github.com/areed1192/tradestation-python-api/blob/master/ts/client.py"""
 class DataFetcher(ExchangeBase):
     __AUTH_ENDPOINT = "https://signin.tradestation.com/oauth/token"
@@ -723,14 +731,16 @@ class DataFetcher(ExchangeBase):
         return response
 
     def fetch_balance(self) -> int:
+        self.account_meta_data = {key: value.reset() for key, value in self.account_meta_data.items()}
         self.account_balances()
         self.account_wallets()
         account_total_balance: float = 0.0
+
         
         for account_id in self.account_meta_data:
             if self.account_meta_data[account_id].Equity:
                 account_total_balance += self.account_meta_data[account_id].Equity
-        
+                
         return round(account_total_balance,3)
 
 
@@ -840,5 +850,6 @@ if __name__ == '__main__':
     current_path = os.path.realpath(os.path.dirname(__file__))
     executor = DataFetcher(pwd, runner.secrets_per_process["tradestation"], runner.port_per_process["tradestation"])
     balances = executor.fetch_balance()
-    print(balances)
-
+    print(f"1 = {balances=}")
+    balances = executor.fetch_balance()
+    print(f"2 = {balances=}")
