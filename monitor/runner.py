@@ -66,7 +66,7 @@ class Runner:
             while True:
                 is_new_day, potential_today = self.is_new_day(self.netliq_to_telegram.netliq_path, today)
                 if is_new_day:
-                    await self.netliq_to_telegram.send_yesterday()
+                    await self.netliq_to_telegram.format_and_send_dataframe()
                     today = potential_today
                 await asyncio.sleep(seconds)
 
