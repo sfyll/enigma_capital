@@ -34,12 +34,13 @@ class netliqToTelgram(telegramHandler):
         structured_df = self.transform_dataframe(df)
         table = tabulate(structured_df, headers='keys', tablefmt='fancy_grid', showindex=True)
 
+
         await self.send_text_to_telegram(f"\n```\n{table}\n```", parse_mode="MarkdownV2")
 
     def transform_dataframe(self, df) -> pd.DataFrame:
         total_columns_len = len(df.columns)
         df.fillna(0, inplace=True)
-        df_pct_change = df.iloc[:, 1:].pct_change().multiply(100)
+        df_pct_change = df.iloc[:, 1:].apply(self.custom_pct_change)
         df = pd.concat([df, df_pct_change.add_suffix('_pct')], axis=1)
         
         last_line_df = df.tail(1).applymap(self.format_value)
@@ -60,6 +61,11 @@ class netliqToTelgram(telegramHandler):
         return structured_df
 
     @staticmethod
+    # Custom function to compute pct_change only for values > 10
+    def custom_pct_change(x):
+        return x.pct_change().multiply(100) if x.iloc[-1] > 10 else 0
+
+    @staticmethod
     def to_single_list(value: list) -> list:
         return [item for sublist in value for item in sublist]
 
@@ -75,4 +81,4 @@ if __name__ == "__main__":
 
     pwd = getpass("provide password for pk:")
     executor = netliqToTelgram(pwd, False)
-    executor.format_and_send_dataframe()
+    asyncio.run(executor.format_and_send_dataframe())
