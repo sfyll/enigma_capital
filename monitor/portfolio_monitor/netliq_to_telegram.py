@@ -61,8 +61,6 @@ class netliqToTelgram(telegramHandler):
         structured_df['Chg'] = structured_df['Chg'].apply(self.format_value_to_pct)
         structured_df['Val'] = structured_df['Val'].apply(self.format_value_to_thousands)
 
-        print(structured_df)
-
         return structured_df
 
     @staticmethod
