@@ -9,7 +9,6 @@ from tabulate import tabulate
 
 from utilities.telegram_handler import telegramHandler
 
-#TODO: Format for phone recipient !
 class netliqToTelgram(telegramHandler):
     pd.set_option('display.max_columns', None)
     pd.set_option('display.max_rows', None)
