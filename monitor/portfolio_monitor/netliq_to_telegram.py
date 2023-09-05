@@ -1,14 +1,17 @@
 import asyncio
+from datetime import datetime
 import logging
 import os
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pandas as pd
+from pandas.plotting import table
 from tabulate import tabulate
 
 from utilities.telegram_handler import telegramHandler
 
-#TODO: Format for phone recipient !
+
 class netliqToTelgram(telegramHandler):
     pd.set_option('display.max_columns', None)
     pd.set_option('display.max_rows', None)
@@ -46,9 +49,15 @@ class netliqToTelgram(telegramHandler):
         pct_change_values = last_line_df.iloc[:, total_columns_len:].T
 
         structured_df = pd.DataFrame({
-            'Value': self.to_single_list(last_row_nav.values),
-            'Pct Change': [last_line_df.iloc[0, 0]] + self.to_single_list(pct_change_values.values)
+            'Val': self.to_single_list(last_row_nav.values),
+            'PctChg': [last_line_df.iloc[0, 0]] + self.to_single_list(pct_change_values.values)
         }, index=last_row_nav.index.values)
+
+        if 'date' in structured_df.index:
+            original_date_str = structured_df.loc['date', 'Val']
+            formatted_date = datetime.strptime(original_date_str, '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%y')
+            structured_df.loc['date', 'Val'] = formatted_date
+            structured_df.loc['date', 'PctChg'] = formatted_date
 
         return structured_df
 
