@@ -146,11 +146,11 @@ echo 'export ENIGMA=~/Documents/dev/enigma_capital ' >> ~/.zshenv`
     
  
  ## TODOs
-- Only localhost is supported for components communication. Allow support for other hosts! ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/data_aggregator/data_aggregator.py#L226))
-- Be able to subscribe to different topics, so that the data_aggregator can scale easily to more usecases ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/data_aggregator/data_aggregator.py#L287))
-- Handle failure. What if an exchange stop publishing and we just loop forever? ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/data_aggregator/data_aggregator.py#L292))
-- Make the function more modular, the data_aggregator should be agnostic to what data is being aggregated as that should be abstracted away. ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/data_aggregator/data_aggregator.py#L293))
-- Properly parse the object below so that the inner dataclass can be read as a dataclass, and not accessed as a dict ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/data_aggregator/data_aggregator.py#L319))
+- Only localhost is supported for components communication. Allow support for other hosts! ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/data_aggregator/data_aggregator.py#L224))
+- Be able to subscribe to different topics, so that the data_aggregator can scale easily to more usecases ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/data_aggregator/data_aggregator.py#L285))
+- Handle failure. What if an exchange stop publishing and we just loop forever? ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/data_aggregator/data_aggregator.py#L290))
+- Make the function more modular, the data_aggregator should be agnostic to what data is being aggregated as that should be abstracted away. ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/data_aggregator/data_aggregator.py#L291))
+- Properly parse the object below so that the inner dataclass can be read as a dataclass, and not accessed as a dict ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/data_aggregator/data_aggregator.py#L317))
 - For now, we only enforce two methods implementation, namely fetch_balance and fetch_positions. As such, process_request is quite statically defined as well. How could we untangle both so that we can define more abstract methods and have the process_request understands what to fetch dynamically. ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/exchanges/exchange_base.py#L12))
 - Batch calls via multicall contracts + use helios lightweight client (need to fix eth_call loops, broken atm) ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/exchanges/ethereum/data_fetcher.py#L42))
 - Fetch positions ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/exchanges/ib_async/data_fetcher.py#L49))
