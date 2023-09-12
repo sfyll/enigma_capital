@@ -167,11 +167,9 @@ class AggregatedData:
         if self.aggregation_interval == 86400:
             if not self.__is_new_day():
                 return False
-            else:
-                return True
 
-        else:
-            return time.time() - min(exchange.last_fetch_timestamp for exchange in self.exchanges.values()) >= self.aggregation_interval    
+        #still ned to check that all exchanges were updated
+        return time.time() - min(exchange.last_fetch_timestamp for exchange in self.exchanges.values()) >= self.aggregation_interval    
 
     def __is_new_day(self) -> bool:
         """
