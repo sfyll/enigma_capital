@@ -167,12 +167,15 @@ class AggregatedData:
         if self.aggregation_interval == 86400:
             if not self.__is_new_day():
                 return False
+            else:
+                return True
 
         #if process was just launched, no need to check for all fetchers to have a new date
         if not self.date:
             return True
 
-        return time.time() - min(exchange.last_fetch_timestamp for exchange in self.exchanges.values()) >= self.aggregation_interval    
+        #last sent object was at least aggregation interval ago
+        return time.time() - datetime.strptime(self.date, '%Y-%m-%d %H:%M:%S').timestamp() >= self.aggregation_interval
 
     def __is_new_day(self) -> bool:
         """
