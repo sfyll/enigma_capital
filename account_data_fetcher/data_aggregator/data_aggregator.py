@@ -293,7 +293,7 @@ class DataAggregator:
             # for topic in exchange_subscription["topic"]:
             #     sub_socket.subscribe(topic)
 
-        #TODO: Handle failure. What if an exchange stop publishing and we just loop forever?
+        #TODO: Handle failure. What if an exchange stop publishing and we just loop forever? Need some form of heartbit logic.
         #TODO: Make the function more modular, the data_aggregator should be agnostic to what data is being aggregated as that should be abstracted away.
         while True:
             _, data = sub_socket.recv_multipart()
