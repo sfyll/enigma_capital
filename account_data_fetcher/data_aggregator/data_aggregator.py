@@ -201,7 +201,7 @@ class AggregatedData:
         Returns:
             dict: The aggregated data object.
         """
-        self.netliq = sum(exchange.balance.value for exchange in self.exchanges.values())
+        self.netliq = round(sum(exchange.balance.value for exchange in self.exchanges.values()),3)
         self.date = time.strftime('%Y-%m-%d %H:%M:%S')
 
         to_send_object = {
