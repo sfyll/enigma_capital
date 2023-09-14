@@ -106,6 +106,7 @@ class DataFetcher(ExchangeBase):
                     if e.code == 1018:
                         self.logger.debug(e)
                         sleep(5)
+                        continue
                     else:
                         raise Exception(f"Unusual error {e}")
             else:
