@@ -3,7 +3,6 @@ from math import isnan
 import os
 from typing import Optional
 
-import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -14,9 +13,9 @@ class returnStudy:
     def get_netliq_path(self) -> str:
         current_path = os.path.realpath(os.path.dirname(__file__))
         base = os.path.dirname(os.path.dirname(current_path))
-        return base + '/account_data_fetcher/netliq.csv', base + '/account_data_fetcher/deposits_and_withdraws.csv'
+        return base + '/account_data_fetcher/csv_db/balance.csv', base + '/account_data_fetcher/csv_db//deposits_and_withdraws.csv'
         
-    def construct_twr(self, start_date: str ='01/03/2023', exchange: Optional[str] = None):
+    def construct_twr(self, start_date: str ='01/01/2023', exchange: Optional[str] = None):
         self.row_cache = pd.DataFrame()
         start_date = datetime.strptime(start_date, '%d/%m/%Y')
 
@@ -108,6 +107,6 @@ class returnStudy:
 
 if __name__ == '__main__':
     executor = returnStudy()
-    daily_twr_data = executor.construct_twr(exchange=None)
+    daily_twr_data = executor.construct_twr(start_date="10/01/2023", exchange=None)
 
     executor.plot_2d(daily_twr_data.index, daily_twr_data['daily_twr'])
