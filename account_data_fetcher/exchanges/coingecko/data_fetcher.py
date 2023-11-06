@@ -17,8 +17,6 @@ class DataFetcher:
         url_base: str = self.__API_ENDPOINT + 'simple/price'
         
         url = self.request_handler.api_module(url_base=url_base)
-        
-        symbols = [symbol.lower() if "DYDX" in symbol else symbol for symbol in symbols]
 
         params = {
             "ids": ",".join(self.id_per_symbol[symbol].lower() for symbol in symbols),
@@ -71,6 +69,8 @@ class DataFetcher:
         for dictionary in result:
             if "wormhole" in dictionary["id"]:
                 continue
+            if "dydx" == dictionary["id"].lower():
+                id_per_symbol["DYDX"] = dictionary["id"].upper()
             id_per_symbol[dictionary["symbol"].upper()] = dictionary["id"].upper()
             symbol_per_id[dictionary["id"].upper()] = dictionary["symbol"].upper()
 
@@ -78,5 +78,5 @@ class DataFetcher:
         self.symbol_per_id: Dict[str, str] =  symbol_per_id
 
 if __name__ == "__main__":
-    executor = coingeckoDataFetcher()
+    executor = DataFetcher()
     print(executor.get_prices(["BTC", "ETH", "AMPL", "DYDX", "DAI"], ["USD"]))
