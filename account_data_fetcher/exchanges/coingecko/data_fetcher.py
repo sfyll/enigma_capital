@@ -19,7 +19,7 @@ class DataFetcher:
         url = self.request_handler.api_module(url_base=url_base)
 
         params = {
-            "ids": ",".join(self.id_per_symbol[symbol].lower() for symbol in symbols),
+            "ids": ",".join(self.id_per_symbol[symbol.lower()].lower() for symbol in symbols),
             "vs_currencies": ",".join(vs_currency.lower() for vs_currency in vs_currencies)
         }
 
