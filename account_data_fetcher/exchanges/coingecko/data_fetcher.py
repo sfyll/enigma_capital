@@ -17,9 +17,11 @@ class DataFetcher:
         url_base: str = self.__API_ENDPOINT + 'simple/price'
         
         url = self.request_handler.api_module(url_base=url_base)
+        
+        symbols = [symbol.lower() if "DYDX" in symbol else symbol for symbol in symbols]
 
         params = {
-            "ids": ",".join(self.id_per_symbol[symbol.lower()].lower() for symbol in symbols),
+            "ids": ",".join(self.id_per_symbol[symbol].lower() for symbol in symbols),
             "vs_currencies": ",".join(vs_currency.lower() for vs_currency in vs_currencies)
         }
 
