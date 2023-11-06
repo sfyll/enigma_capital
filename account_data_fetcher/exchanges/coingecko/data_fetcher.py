@@ -71,12 +71,14 @@ class DataFetcher:
                 continue
             if "dydx" == dictionary["id"].lower():
                 id_per_symbol["DYDX"] = dictionary["id"].upper()
-            id_per_symbol[dictionary["symbol"].upper()] = dictionary["id"].upper()
-            symbol_per_id[dictionary["id"].upper()] = dictionary["symbol"].upper()
+                symbol_per_id[dictionary["id"].upper()] = "DYDX"
+            else:
+                id_per_symbol[dictionary["symbol"].upper()] = dictionary["id"].upper()
+                symbol_per_id[dictionary["id"].upper()] = dictionary["symbol"].upper()
 
         self.id_per_symbol: Dict[str, str] =  id_per_symbol
         self.symbol_per_id: Dict[str, str] =  symbol_per_id
 
 if __name__ == "__main__":
     executor = DataFetcher()
-    print(executor.get_prices(["BTC", "ETH", "AMPL", "DYDX", "DAI"], ["USD"]))
+    print(executor.get_prices(["DYDX"], ["USD"]))
