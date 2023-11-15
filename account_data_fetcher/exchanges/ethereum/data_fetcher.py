@@ -110,9 +110,9 @@ class DataFetcher(ExchangeBase):
         for coin, _ in self.__ADDRESS_BY_COIN.items():
             for _ in self.address_of_interest:
                balance = self.w3.toInt(multi_call_result[counter])
-               if coin in balance_by_coin:
+               if coin in balance_by_coin and int(balance) > 0:
                    balance_by_coin[coin] += balance / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
-               else:
+               elif coin not in balance_by_coin and int(balance) > 0:
                    balance_by_coin[coin] = balance / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
                counter += 1
 
