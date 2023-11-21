@@ -1,6 +1,7 @@
 from datetime import timezone, datetime, timedelta
 import logging
 import os
+from requests.exceptions import ReadTimeout
 from time import sleep
 from typing import Optional
 
@@ -43,6 +44,10 @@ class DataFetcher(ExchangeBase):
     def fetch_balance(self, accountType = None) -> float:
         if not self.is_acceptable_timestamp_detla(self.balance_object, "BALANCE"):
             self.get_balance_object()
+        
+        self.logger.debug(
+            f"{self.balance_object=}"
+        )
         return round(float(self.balance_object.ChangeInNAV.endingValue),3)
 
     def fetch_positions(self, accountType = None) -> dict:
@@ -109,6 +114,10 @@ class DataFetcher(ExchangeBase):
                         continue
                     else:
                         raise Exception(f"Unusual error {e}")
+                except ReadTimeout as e:
+                    self.logger.debug(e)
+                    sleep(15)
+                    continue
             else:
                 raise Exception("Kept on getting errors")
     
@@ -125,8 +134,7 @@ if __name__ == '__main__':
     logger: logging.Logger = logging.getLogger()
     pwd = getpass("provide password for pk:")
     current_path = os.path.realpath(os.path.dirname(__file__))
-    executor = ibDataFetcher(current_path, pwd)
-    balances = executor.get_netliq()
-    balances = executor.get_netliq()
+    executor = DataFetcher(current_path, pwd)
+    balances = executor.fetch_balance()
     print(balances)
 
