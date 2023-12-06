@@ -177,11 +177,14 @@ class DataFetcher(ExchangeBase):
         for asset_information in binance_balances:
             btc_amount = float(asset_information["btcValuation"])
             asset_amount = float(asset_information["free"])
-            if  btc_amount > 0.1:
+            if  btc_amount > 0.1 or asset_amount > 100:
                 if asset_information['asset'] in ["BUSD", "USDC", "USDT"]:
                     netliq_in_dollars += asset_amount
                     continue
-                price = float(self.get_latest_price(asset_information["asset"]+"USDC")["price"])
+                elif "NFT" in asset_information['asset']:
+                    continue
+                self.logger.info(f'{asset_information["asset"]=}')
+                price = float(self.get_latest_price(asset_information["asset"]+"USDT")["price"])
                 netliq_in_dollars += price * asset_amount
         return round(netliq_in_dollars,3)
 
