@@ -8,12 +8,12 @@ import pandas as pd
 
 class returnStudy:
     def __init__(self):
-        self.netliq_path, self.transactions_path = self.get_netliq_path()
+        self.base_path, self.netliq_path, self.transactions_path = self.get_netliq_path()
         
     def get_netliq_path(self) -> str:
         current_path = os.path.realpath(os.path.dirname(__file__))
         base = os.path.dirname(os.path.dirname(current_path))
-        return base + '/account_data_fetcher/csv_db/balance.csv', base + '/account_data_fetcher/csv_db//deposits_and_withdraws.csv'
+        return base, base + '/account_data_fetcher/csv_db/balance.csv', base + '/account_data_fetcher/csv_db//deposits_and_withdraws.csv'
         
     def construct_twr(self, start_date: str ='01/01/2023', exchange: Optional[str] = None):
         self.row_cache = pd.DataFrame()
@@ -105,8 +105,33 @@ class returnStudy:
         plt.grid()
         plt.show()
 
+    def save_to_csv(self, df: pd.DataFrame, filename):
+        """
+        Saves a given DataFrame to a CSV file.
+        :param df: DataFrame to be saved.
+        :param filename: The name of the file to save the data.
+        """
+        # Using the netliq path to determine the directory
+        file_path = os.path.join(self.base_path, filename)
+        
+        df.to_csv(file_path)
+    
+    def load_csv(self, filename):
+        """
+        Load a given CSV file into a DataFrame.
+        :param df: DataFrame to be saved.
+        :param filename: The name of the file to save the data.
+        """
+        # Using the netliq path to determine the directory
+        file_path = os.path.join(self.base_path, filename)
+        # Read the CSV file and return the DataFrame
+        return pd.read_csv(file_path, index_col='date', parse_dates=True)
+
+
 if __name__ == '__main__':
     executor = returnStudy()
-    daily_twr_data = executor.construct_twr(start_date="10/01/2023", exchange=None)
+    # daily_twr_data = executor.construct_twr(start_date="10/01/2023", exchange=None)
+    daily_twr_data = executor.load_csv("account_data_fetcher/csv_db/daily_statistics.csv")
+    executor.save_to_csv(daily_twr_data, "account_data_fetcher/csv_db/daily_statistics.csv")
 
     executor.plot_2d(daily_twr_data.index, daily_twr_data['daily_twr'])
