@@ -32,6 +32,7 @@ class DataFetcher:
         price_per_symbol: Dict[str, Dict[str, float]] = {}
 
         for coin, price_dict in result.items():
+            print(f"{coin=}, {price_dict=}")
             price_per_symbol[self.symbol_per_id[coin.upper()]] = price_dict
 
         self.logger.debug(f"{price_per_symbol=}")
@@ -65,7 +66,6 @@ class DataFetcher:
 
         id_per_symbol : Dict[str, str] = {}
         symbol_per_id : Dict[str, str] = {}
-
         for dictionary in result:
             if "wormhole" in dictionary["id"]:
                 continue
@@ -73,12 +73,14 @@ class DataFetcher:
                 id_per_symbol["DYDX"] = dictionary["id"].upper()
                 symbol_per_id[dictionary["id"].upper()] = "DYDX"
             else:
-                id_per_symbol[dictionary["symbol"].upper()] = dictionary["id"].upper()
-                symbol_per_id[dictionary["id"].upper()] = dictionary["symbol"].upper()
+                if dictionary["symbol"].upper() not in id_per_symbol:
+                    #usually first symbol occurance is the correct one
+                    id_per_symbol[dictionary["symbol"].upper()] = dictionary["id"].upper()
+                    symbol_per_id[dictionary["id"].upper()] = dictionary["symbol"].upper()
 
         self.id_per_symbol: Dict[str, str] =  id_per_symbol
         self.symbol_per_id: Dict[str, str] =  symbol_per_id
 
 if __name__ == "__main__":
     executor = DataFetcher()
-    print(executor.get_prices(["DYDX"], ["USD"]))
+    print(executor.get_prices(["BTC"], ["USD"]))
