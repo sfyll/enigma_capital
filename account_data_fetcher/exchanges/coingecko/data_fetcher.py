@@ -66,6 +66,9 @@ class DataFetcher:
         id_per_symbol : Dict[str, str] = {}
         symbol_per_id : Dict[str, str] = {}
         for dictionary in result:
+            if "CoW Protocol" in dictionary["name"]:
+                id_per_symbol[dictionary["symbol"].upper()] = dictionary["id"].upper()
+                symbol_per_id[dictionary["id"].upper()] = dictionary["symbol"].upper()
             if "wormhole" in dictionary["id"]:
                 continue
             if "dydx" == dictionary["id"].lower():
@@ -82,4 +85,4 @@ class DataFetcher:
 
 if __name__ == "__main__":
     executor = DataFetcher()
-    print(executor.get_prices(["BTC"], ["USD"]))
+    print(executor.get_prices(["COW"], ["USD"]))
