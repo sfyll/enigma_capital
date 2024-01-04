@@ -32,7 +32,6 @@ class DataFetcher:
         price_per_symbol: Dict[str, Dict[str, float]] = {}
 
         for coin, price_dict in result.items():
-            print(f"{coin=}, {price_dict=}")
             price_per_symbol[self.symbol_per_id[coin.upper()]] = price_dict
 
         self.logger.debug(f"{price_per_symbol=}")
