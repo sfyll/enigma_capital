@@ -24,12 +24,16 @@ class Writer(WriterBase):
             df = pd.read_csv(balance_path, nrows=1)  # Read just the first row to get columns
             existing_columns = list(df.columns)
             new_columns = list(balances.keys())
+
+            if 'date' not in new_columns:
+                raise ValueError("The 'date' column is missing from the balances.")
             
-            if existing_columns != new_columns:
-                set_existing_columns = set(existing_columns)
-                set_new_columns = set(new_columns)
-                
-                if set_new_columns.issuperset(set_existing_columns):
+            set_existing_columns = set(existing_columns)
+            set_new_columns = set(new_columns)
+            new_col_dif = set_new_columns - set_existing_columns
+            
+            if set_existing_columns!= set_new_columns:
+                if set_new_columns.issuperset(set_existing_columns) or new_col_dif:
                     # New columns added, rewrite the whole CSV
                     df = pd.read_csv(balance_path, index_col="date")
                     for col in set_new_columns - set_existing_columns:
@@ -45,6 +49,7 @@ class Writer(WriterBase):
                     with open(balance_path, 'a', newline='') as csvfile:
                         writer = DictWriter(csvfile, fieldnames=existing_columns)
                         writer.writerow(balances)
+
             else:
                 # Columns match, just append the row
                 with open(balance_path, 'a', newline='') as csvfile:

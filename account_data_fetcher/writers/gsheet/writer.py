@@ -54,8 +54,10 @@ class Writer(WriterBase):
             worksheet.append_row(list(balances.values()))
             return       
 
+        new_col_dif = set_new_columns - set_headers 
+        
         if set_new_columns != set_headers:
-            if set_new_columns.issuperset(set_headers):
+            if set_new_columns.issuperset(set_headers) or new_col_dif:
                 # New columns added, rewrite the entire sheet
                 records = worksheet.get_all_records()
                 df = pd.DataFrame(records)
