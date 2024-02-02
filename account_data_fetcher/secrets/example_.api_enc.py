@@ -15,5 +15,7 @@
 'Kraken': 
     {'Key': 'value', 'Secret': 'value', 'Other_fields': {}}, 
 'Ethereum': 
-    {'Key': 'value', 'Secret': '', 'Other_fields': {}}
-}
+    {'Key': 'value', 'Secret': '', 'Other_fields': {}},
+'KUCOIN':
+    {'Key': 'value', 'Secret': 'value', 'Other_fields': {'Passphrase': ''}}
+ }
