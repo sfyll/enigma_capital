@@ -65,7 +65,7 @@ class depositAndWithdrawHandler:
         __SUPPORTED_EXCHANGE (set): Set of supported exchanges.
         data (DepositAndWithdraw): An instance of DepositAndWithdraw dataclass.
     """
-    __SUPPORTED_EXCHANGE: set = ("BINANCE", "BYBIT", "DYDX", "ETHEREUM", "IB", "TRADESTATION", "KRAKEN", "ONCHAIN")    
+    __SUPPORTED_EXCHANGE: set = ("BINANCE", "KUCOIN", "BYBIT", "DYDX", "ETHEREUM", "IB", "TRADESTATION", "KRAKEN", "ONCHAIN")    
     
     def __init__(self) -> None:
         """Initializes the depositAndWithdrawHandler object and prompts for transaction info."""
