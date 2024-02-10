@@ -59,7 +59,7 @@ class DataFetcher(ExchangeBase):
         contract_by_coin: dict = {}
         
         for coin in self.__ADDRESS_BY_COIN:
-            contract_by_coin[coin] = self.w3.eth.contract(Web3.toChecksumAddress(self.__ADDRESS_BY_COIN[coin]), abi=ERC_20_ABI)
+            contract_by_coin[coin] = self.w3.eth.contract(Web3.to_checksum_address(self.__ADDRESS_BY_COIN[coin]), abi=ERC_20_ABI)
         
         return contract_by_coin
 
@@ -105,7 +105,7 @@ class DataFetcher(ExchangeBase):
 
         for coin, contract in self.contract_by_coin.items():
             for my_address in self.address_of_interest: 
-                    result = contract.functions.balanceOf(Web3.toChecksumAddress(my_address)).call()
+                    result = contract.functions.balanceOf(Web3.to_checksum_address(my_address)).call()
                     if coin in balance_by_coin.keys():
                         balance_by_coin[coin.upper()] += int(result) / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
                     else:
@@ -117,7 +117,7 @@ class DataFetcher(ExchangeBase):
         balance: float = 0
         
         for my_address in self.address_of_interest:
-            balance +=  self.w3.eth.get_balance(Web3.toChecksumAddress(my_address)) / (10 ** self.__DECIMAL_BY_COIN["BTC"])
+            balance +=  self.w3.eth.get_balance(Web3.to_checksum_address(my_address)) / (10 ** self.__DECIMAL_BY_COIN["BTC"])
 
         return balance
     

@@ -73,7 +73,10 @@ class DataFetcher:
                 continue
             if "dydx" == dictionary["id"].lower():
                 id_per_symbol["DYDX"] = dictionary["id"].upper()
-                symbol_per_id[dictionary["id"].upper()] = "DYDX"
+                symbol_per_id[dictionary["id"].upper()] = "DYDX" 
+            if "sovryn" == dictionary["id"].lower():
+                id_per_symbol[dictionary["symbol"].upper()] = dictionary["id"].upper()
+                symbol_per_id[dictionary["id"].upper()] = dictionary["symbol"].upper()
             else:
                 if dictionary["symbol"].upper() not in id_per_symbol:
                     #usually first symbol occurance is the correct one
@@ -85,4 +88,4 @@ class DataFetcher:
 
 if __name__ == "__main__":
     executor = DataFetcher()
-    print(executor.get_prices(["COW"], ["USD"]))
+    print(executor.get_prices(["SOV"], ["USD"]))
