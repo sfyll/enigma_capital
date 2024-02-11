@@ -61,7 +61,7 @@ class DataFetcher(ExchangeBase):
         contract_by_coin: dict = {}
         
         for coin in self.__ADDRESS_BY_COIN:
-            contract_by_coin[coin] = self.w3.eth.contract(Web3.toChecksumAddress(self.__ADDRESS_BY_COIN[coin]), abi=ERC_20_ABI)
+            contract_by_coin[coin] = self.w3.eth.contract(Web3.to_checksum_address(self.__ADDRESS_BY_COIN[coin]), abi=ERC_20_ABI)
         
         return contract_by_coin
 
@@ -97,7 +97,7 @@ class DataFetcher(ExchangeBase):
         balance: float = 0
         
         for my_address in self.address_of_interest:
-            balance +=  self.w3.eth.get_balance(Web3.toChecksumAddress(my_address)) / (10 ** self.__DECIMAL_BY_COIN["ETH"])
+            balance +=  self.w3.eth.get_balance(Web3.to_checksum_address(my_address)) / (10 ** self.__DECIMAL_BY_COIN["ETH"])
 
         return balance
     
@@ -123,7 +123,7 @@ class DataFetcher(ExchangeBase):
         
         for coin, token_address in self.__ADDRESS_BY_COIN.items():
             for address in self.address_of_interest:
-                balance_call_data = self.contract_by_coin[coin].encodeABI(fn_name='balanceOf', args=[Web3.toChecksumAddress(address)])  
+                balance_call_data = self.contract_by_coin[coin].encodeABI(fn_name='balanceOf', args=[Web3.to_checksum_address(address)])  
                 calls.append((token_address, balance_call_data))
                 
         multicall_contract = self.w3.eth.contract(address=MULTICALL_3_ADDRESS, abi=MULTICALL3_ABI)
@@ -199,8 +199,8 @@ class DataFetcher(ExchangeBase):
             for my_address in ["0x9527465642a7015738ef24201eec1644f3755670", "0x0f366a411dc9f8a1611cad614d8f451436fc4f4b",
                                "0x630276c20064545c06360bbd3ef48025abe3316a", "0xbe6e784ad98581be1077ddf630205ac30ce8128b",
                                "0xa48aa5c696357f29a187fb408f1a5c9ecab445c5"]:
-                calls.append(contract.encodeABI(fn_name="balanceOf", args=[Web3.toChecksumAddress(my_address)]))
-                addresses.append(Web3.toChecksumAddress(self.__ADDRESS_BY_COIN[coin]))
+                calls.append(contract.encodeABI(fn_name="balanceOf", args=[Web3.to_checksum_address(my_address)]))
+                addresses.append(Web3.to_checksum_address(self.__ADDRESS_BY_COIN[coin]))
 
         return calls, addresses
     
@@ -209,7 +209,7 @@ class DataFetcher(ExchangeBase):
 
         for coin, contract in self.contract_by_coin.items():
             for my_address in self.address_of_interest: 
-                    result = contract.functions.balanceOf(Web3.toChecksumAddress(my_address)).call()
+                    result = contract.functions.balanceOf(Web3.to_checksum_address(my_address)).call()
                     if coin in balance_by_coin.keys():
                         balance_by_coin[coin.upper()] += int(result) / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
                     else:
