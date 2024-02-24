@@ -15,9 +15,11 @@ class Writer(WriterBase):
     __SCOPE = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
                "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
     __WRITER = "GSHEET"
+    __PATH_SUFFIX = "/account_data_fetcher/csv_db/"
     def __init__(self, secrets: ApiMetaData, data_aggregator_port_number: int, port_number: int) -> None:
         super().__init__(data_aggregator_port_number, port_number, self.__WRITER)
         self.logger = logging.getLogger(__name__)
+        self.path = self.get_base_path() + self.__PATH_SUFFIX
         self.authenticate(secrets)
 
     def authenticate(self, secrets: ApiMetaData) -> None:
@@ -37,22 +39,22 @@ class Writer(WriterBase):
             self.client.import_csv(spreadsheet.id, data = content)
 
     def update_balances(self, balances: Dict[str, float]) -> None:
+        balance_path = self.path + 'balance.csv'
         spreadsheet = self.client.open('Balances')
         worksheet = spreadsheet.get_worksheet(0)
         
         # Fetch only the headers
         headers = worksheet.row_values(1)
         
+        # If the sheet is empty
+        if not headers:
+            # the below method has risks of race conditions if balances are being updated
+            self.write_balances(balance_path) 
+            return       
+        
         new_columns = list(balances.keys())
         set_new_columns = set(new_columns)
         set_headers = set(headers)
-
-        # If the sheet is empty
-        if not headers:
-            # Add headers and the first row
-            worksheet.append_row(new_columns)
-            worksheet.append_row(list(balances.values()))
-            return       
 
         new_col_dif = set_new_columns - set_headers 
         
