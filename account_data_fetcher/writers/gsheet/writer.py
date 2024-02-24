@@ -27,13 +27,13 @@ class Writer(WriterBase):
         self.client = gspread.authorize(credentials)
 
     def write_balances(self, csv_path: str) -> None:
-        spreadsheet = self.client.open('Netliq')
+        spreadsheet = self.client.open('Balances')
         with open(csv_path, "r") as file_obj:
             content = file_obj.read()
             self.client.import_csv(spreadsheet.id, data = content)
 
     def write_positions(self, csv_path: str) -> None:
-        spreadsheet = self.client.open("Position")
+        spreadsheet = self.client.open("Positions")
         with open(csv_path, "r") as file_obj:
             content = file_obj.read()
             self.client.import_csv(spreadsheet.id, data = content)
