@@ -63,29 +63,32 @@ class DataFetcher:
                 args=params
             )
 
+        # coingecko doesn't return errors most of the time
+        if not result:
+            sleep(60)
+            result: List[dict] =  self.request_handler.handle_requests(
+                url=url,
+                method="get",
+                args=params
+            )
+
         id_per_symbol : Dict[str, str] = {}
         symbol_per_id : Dict[str, str] = {}
         for dictionary in result:
-            if "CoW Protocol" in dictionary["name"]:
-                id_per_symbol[dictionary["symbol"].upper()] = dictionary["id"].upper()
-                symbol_per_id[dictionary["id"].upper()] = dictionary["symbol"].upper()
-            if "wormhole" in dictionary["id"]:
-                continue
             if "dydx" == dictionary["id"].lower():
+                print(f"{dictionary=}")
                 id_per_symbol["DYDX"] = dictionary["id"].upper()
                 symbol_per_id[dictionary["id"].upper()] = "DYDX" 
-            if "sovryn" == dictionary["id"].lower():
+            else:
                 id_per_symbol[dictionary["symbol"].upper()] = dictionary["id"].upper()
                 symbol_per_id[dictionary["id"].upper()] = dictionary["symbol"].upper()
-            else:
-                if dictionary["symbol"].upper() not in id_per_symbol:
-                    #usually first symbol occurance is the correct one
-                    id_per_symbol[dictionary["symbol"].upper()] = dictionary["id"].upper()
-                    symbol_per_id[dictionary["id"].upper()] = dictionary["symbol"].upper()
 
         self.id_per_symbol: Dict[str, str] =  id_per_symbol
         self.symbol_per_id: Dict[str, str] =  symbol_per_id
 
 if __name__ == "__main__":
     executor = DataFetcher()
+    print(executor.get_prices(["ORDS"], ["USD"]))
+    print(executor.get_prices(["DYDX"], ["USD"]))
     print(executor.get_prices(["SOV"], ["USD"]))
+    print(executor.get_prices(["COW"], ["USD"]))
