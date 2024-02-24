@@ -56,8 +56,8 @@ class Writer(WriterBase):
 
         new_col_dif = set_new_columns - set_headers 
         
-        if set_new_columns != set_headers:
-            if set_new_columns.issuperset(set_headers) or new_col_dif:
+        if new_col_dif:
+            if set_new_columns.issuperset(set_headers):
                 # New columns added, rewrite the entire sheet
                 records = worksheet.get_all_records()
                 df = pd.DataFrame(records)
@@ -83,14 +83,25 @@ class Writer(WriterBase):
             # Columns are different but neither set is a subset of the other / might be due to different naming convention1
             # Append the new columns on the right side and fill in zeros for old records
                 new_cols_to_add = list(set_new_columns - set_headers)
-                worksheet.append_row(new_cols_to_add, table_range="B1")
-                row_to_append = [balances.get(col, float(0)) for col in headers] + [balances.get(col, float(0)) for col in new_cols_to_add]
-                worksheet.append_row(row_to_append)
 
+                records = worksheet.get_all_records()
+                df = pd.DataFrame(records)
+                
+                for col in new_cols_to_add:
+                    df[col] = float(0)
+                
+                new_row = pd.DataFrame([balances]).set_index("date")
+                df = pd.concat([df, new_row])
+                
+                # Update the entire Google Sheet
+                worksheet.clear()
+                worksheet.append_row(new_columns)
+                for _, row in df.iterrows():
+                    worksheet.append_row(list(row))
         else:
-            # Columns match, just append the row
-            worksheet.append_row(list(balances.values()))
-
+            # Columns match, just append the row in the correct order
+            row_to_append = [balances.get(col, float(0)) for col in headers]
+            worksheet.append_row(row_to_append)
 
     def update_positions(self, position_dict: dict) -> None:
         spreadsheet = self.client.open("Positions")
