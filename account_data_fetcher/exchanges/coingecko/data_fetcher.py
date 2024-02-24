@@ -76,7 +76,6 @@ class DataFetcher:
         symbol_per_id : Dict[str, str] = {}
         for dictionary in result:
             if "dydx" == dictionary["id"].lower():
-                print(f"{dictionary=}")
                 id_per_symbol["DYDX"] = dictionary["id"].upper()
                 symbol_per_id[dictionary["id"].upper()] = "DYDX" 
             else:
@@ -88,7 +87,4 @@ class DataFetcher:
 
 if __name__ == "__main__":
     executor = DataFetcher()
-    print(executor.get_prices(["ORDS"], ["USD"]))
     print(executor.get_prices(["DYDX"], ["USD"]))
-    print(executor.get_prices(["SOV"], ["USD"]))
-    print(executor.get_prices(["COW"], ["USD"]))
