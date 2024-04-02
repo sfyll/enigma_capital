@@ -65,9 +65,11 @@ class Runner:
             self.netliq_to_telegram = netliqToTelgram(pwd)
             while True:
                 is_new_day, potential_today = self.is_new_day(self.netliq_to_telegram.netliq_path, today)
+                self.logger.debug(f"{is_new_day=}, {potential_today=}")
                 if is_new_day:
-                    await self.netliq_to_telegram.format_and_send_dataframe()
-                    today = potential_today
+                    result = await self.netliq_to_telegram.format_and_send_dataframe()
+                    if result == True:
+                        today = potential_today
                 await asyncio.sleep(seconds)
 
         def is_new_week(self) -> bool:
