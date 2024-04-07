@@ -3,7 +3,7 @@ name: Update README TODOS
 on:
   push:
     branches:
-      - '**' # any feature branches you may use
+      - 'master'  # any feature branches you may use
     workflow_dispatch:
 
 env:
