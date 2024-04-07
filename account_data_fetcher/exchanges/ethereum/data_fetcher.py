@@ -43,19 +43,36 @@ class priceMetaData:
 class DataFetcher(ExchangeBase):
     __URL = "https://eth-mainnet.g.alchemy.com/v2/"
     __EXCHANGE = "Ethereum"
-    __ADDRESS_BY_COIN = {"USDC":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7", "AMPL":"0xD46bA6D942050d489DBd938a2C909A5d5039A161",  "DYDX": "0x92D6C1e31e14520e676a687F0a93788B716BEff5", "COW": "0xDEf1CA1fb7FBcDC777520aa7f396b4E015F497aB", "ORDS": "0x8AB2ff0116A279a99950C66A12298962D152B83c", "SAVM": "0x15e6E0D4ebeAC120F9a97e71FaA6a0235b85ED12"}
-    __DECIMAL_BY_COIN = {"USDC": 6, "USDT": 6, "AMPL": 9, "DYDX": 18, "ETH": 18, "COW": 18, "ORDS": 18, "SAVM": 18}
 
     def __init__(self, secrets: ApiMetaData, port_number: int, delta_in_seconds_allowed: int = 30) -> None:
         super().__init__(port_number, self.__EXCHANGE)
         self.logger = logging.getLogger(__name__) 
         self.price_meta_data: Optional[priceMetaData] = None
         self.balance_meta_data: Optional[balanceMetaData] = None
+        self.__ADDRESS_BY_COIN, self.__DECIMAL_BY_COIN = self.__get_coin_configs()
         self.w3 = Web3(Web3.HTTPProvider(self.__URL+secrets.key))
         self.contract_by_coin: dict = self.__get_contract_by_coin()
         self.address_of_interest: list = self.__get_address_of_interest()
         self.delta_in_seconds_allowed: int = delta_in_seconds_allowed
         self.price_fetcher: CoingeckoDataFetcher = CoingeckoDataFetcher()
+    
+    @staticmethod
+    def __get_coin_configs():
+        address_by_coin: dict = {}
+        decimal_by_coin: dict = {}
+
+        current_directory = os.path.dirname(__file__)
+        path = os.path.abspath(os.path.join(current_directory, '..', '..', 'config', 'coin_meta_data.json'))
+        
+        with open(path, "r") as f:
+            configs = json.load(f)
+
+            for coin, config in configs.items():
+                if 'address' in config:
+                    address_by_coin[coin] = config['address']
+                decimal_by_coin[coin] = config['decimals']
+
+        return address_by_coin, decimal_by_coin
 
     def __get_contract_by_coin(self) -> dict:
         contract_by_coin: dict = {}
