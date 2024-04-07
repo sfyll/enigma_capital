@@ -73,7 +73,7 @@ class Runner(RunnerBase):
 
             return secrets
             
-        def launch_processes(self, pwd: str, process_type: str, process_names: List[str], factory_prefix: str) -> None:
+        def launch_processes(self, pwd: str, process_type: str, frequency: int, process_names: List[str], factory_prefix: str) -> None:
             """
             Launches specified processes by calling the factory implementation.
 
@@ -103,6 +103,7 @@ class Runner(RunnerBase):
                     f"--{process_type}_name", process_name,
                     "--kwargs", json.dumps({
                         "port_number": self.port_per_process[process_name],
+                        "update_frequency":frequency,
                         "secrets": secrets_json,
                         "password": pwd,
                         "data_aggregator_port_number": self.port_per_process["dataaggregator"]
@@ -190,7 +191,7 @@ if __name__ == "__main__":
 
     executor.launch_data_aggregator("data_aggregator", args.seconds, args.exchanges, args.writers)
 
-    executor.launch_processes(pwd, 'writer', args.writers, 'writers')
+    executor.launch_processes(pwd, 'writer', args.seconds, args.writers, 'writers')
 
-    executor.launch_processes(pwd, 'exchange', args.exchanges, 'exchanges')
+    executor.launch_processes(pwd, 'exchange', args.seconds, args.exchanges, 'exchanges')
 
