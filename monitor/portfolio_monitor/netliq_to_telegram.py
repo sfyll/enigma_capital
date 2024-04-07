@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 from tabulate import tabulate
+from telegram import Bot, Message
 
 from utilities.telegram_handler import telegramHandler
 
@@ -25,7 +26,7 @@ class netliqToTelgram(telegramHandler):
         base = current_path.parent.parent
         return os.path.join(base, 'account_data_fetcher/csv_db/balance.csv')
     
-    async def format_and_send_dataframe(self) -> None:
+    async def format_and_send_dataframe(self) -> bool:
         df = pd.read_csv(self.netliq_path)
         
         pd.options.display.float_format = "{:,.2f}".format
@@ -33,8 +34,12 @@ class netliqToTelgram(telegramHandler):
         structured_df = self.transform_dataframe(df)
         table = tabulate(structured_df, headers='keys', tablefmt='fancy_grid', showindex=True)
 
-
-        await self.send_text_to_telegram(f"\n```\n{table}\n```", parse_mode="MarkdownV2")
+        result = await self.send_text_to_telegram(f"\n```\n{table}\n```", parse_mode="MarkdownV2")
+        
+        if isinstance(result,Message):
+            return True
+        else:
+            return False
 
     def transform_dataframe(self, df) -> pd.DataFrame:
         total_columns_len = len(df.columns)
