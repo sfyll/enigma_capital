@@ -108,7 +108,7 @@ class DataFetcher(ExchangeBase):
                 try:
                     return client.download(token, query_id)
                 except ResponseCodeError as e:
-                    if e.code == 1018:
+                    if int(e.code) == 1018:
                         self.logger.debug(e)
                         sleep(5)
                         continue
