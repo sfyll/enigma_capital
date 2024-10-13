@@ -9,7 +9,7 @@ import time
 from typing import List, Optional
 
 from account_data_fetcher.exchanges.bybit.exception import InvalidRequestError, FailedRequestError
-from utilities.request_handler import requestHandler
+from utilities.request_handler import RateLimitExceededError, requestHandler
 
 class bybitApiConnector:
     __ENDPOINT="https://api.bybit.com"
@@ -160,7 +160,8 @@ class bybitApiConnector:
             except (
                 ReadTimeout,
                 SSLError,
-                ConnectionError
+                ConnectionError,
+                RateLimitExceededError
             ) as e:
                 if self.force_retry:
                     self.logger.error(f'{e}. {retries_attempted}')
@@ -187,7 +188,6 @@ class bybitApiConnector:
                     )
 
             if response['retCode']:
-
                     # Generate error message.
                     error_msg = (
                         f'{response["retMsg"]} (ErrCode: {response["retCode"]})'
