@@ -3,6 +3,10 @@ from typing import Optional, Union
 
 import requests
 
+class RateLimitExceededError(Exception):
+    """Custom exception for rate limiting errors"""
+    pass
+
 class requestHandler:
     def ___init__(self) -> None:
         self.logger = logging.getLogger(__name__)
@@ -74,7 +78,10 @@ class requestHandler:
                 'The type of request you are making is incorrect.')
 
         if raw_response:
-            return response
+            if response.status_code == 403:
+                raise RateLimitExceededError(f"Rate limit hit for URL: {url}")
+            else:
+                return response
         
         else:
             # grab the status code
