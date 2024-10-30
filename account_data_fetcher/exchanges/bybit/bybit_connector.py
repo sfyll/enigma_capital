@@ -80,7 +80,7 @@ class bybitApiConnector:
         return response["result"]["balance"]
 
     def get_last_traded_price(self, **kwargs)-> dict[str, str]:
-        module = "spot/v3/public/quote/ticker/price"
+        module = "v5/market/tickers"
         
         url = self.__request_handler.endpoint_extension(self.__ENDPOINT, module)
         
@@ -89,8 +89,8 @@ class bybitApiConnector:
             path=url,
             req_params=kwargs
         )
-
-        return response["result"]
+        # Assuming one ticker at a time
+        return response["result"]["list"][0]
 
     def __wallet_balance(self, **kwargs) -> dict:
         module = "v5/account/wallet-balance"
@@ -131,7 +131,6 @@ class bybitApiConnector:
         return hash_hmac.hexdigest()
 
     def __prepare_and_handle_request(self, method: str, path: str, req_params: dict):
-
         # Send request and return headers with body. Retry if failed.
         retries_attempted = self.max_retries
 
@@ -164,7 +163,7 @@ class bybitApiConnector:
                 RateLimitExceededError
             ) as e:
                 if self.force_retry:
-                    self.logger.error(f'{e}. {retries_attempted}')
+                    self.logger.error(f'{e}. {retries_attempted=}')
                     time.sleep(self.retry_delay)
                     continue
                 else:
@@ -219,6 +218,7 @@ class bybitApiConnector:
                                 f'Ratelimit will reset at {reset_str}. '
                                 f'Sleeping for {err_delay} seconds'
                             )
+                            time.sleep(err_delay)
 
                     else:
                         raise InvalidRequestError(

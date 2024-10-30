@@ -193,17 +193,17 @@ class DataFetcher(ExchangeBase):
     def __get_coin_price(self, symbol: str) -> float:
         "starting with most likely, USDT unfort"
         try:
-            return float(self.bybit_connector.get_last_traded_price(symbol=symbol+"USDT")["price"])
+            return float(self.bybit_connector.get_last_traded_price(category="spot",symbol=symbol+"USDT")["lastPrice"])
         except InvalidRequestError:
             pass
 
         try:
-            return float(self.bybit_connector.get_last_traded_price(symbol=symbol+"USD")["price"])
+            return float(self.bybit_connector.get_last_traded_price(category="spot",symbol=symbol+"USD")["lastPrice"])
         except InvalidRequestError:
             pass
 
         try:
-            return float(self.bybit_connector.get_last_traded_price(symbol=symbol+"USDC")["price"])
+            return float(self.bybit_connector.get_last_traded_price(category="spot",symbol=symbol+"USDC")["lastPrice"])
         except InvalidRequestError:
             pass
     
