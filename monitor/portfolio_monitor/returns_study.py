@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 from math import isnan
 import os
@@ -11,9 +12,19 @@ class returnStudy:
         self.base_path, self.netliq_path, self.transactions_path = self.get_netliq_path()
         
     def get_netliq_path(self) -> str:
+        base = self.find_project_root()
+        return base, base + '/account_data_fetcher/csv_db/balance.csv', base + '/account_data_fetcher/csv_db/deposits_and_withdraws.csv'
+
+    def find_project_root(self) -> str:
+        """
+        Locate the project root by searching for the directory containing the 'env' folder.
+        """
         current_path = os.path.realpath(os.path.dirname(__file__))
-        base = os.path.dirname(os.path.dirname(current_path))
-        return base, base + '/account_data_fetcher/csv_db/balance.csv', base + '/account_data_fetcher/csv_db//deposits_and_withdraws.csv'
+        while current_path != '/':
+            if 'env' in os.listdir(current_path):
+                return current_path
+            current_path = os.path.dirname(current_path)
+        raise RuntimeError("Project root not found. Ensure the 'env' directory exists at the root.")
         
     def construct_twr(self, start_date: str ='01/01/2023', exchange: Optional[str] = None):
         self.row_cache = pd.DataFrame()
@@ -129,9 +140,28 @@ class returnStudy:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Run the return study script.")
+    parser.add_argument(
+        '--start-date',
+        type=str,
+        default="01/01/2024",
+        help="The start date for the TWR calculation in the format DD/MM/YYYY. Defaults to 01/01/2024."
+    )
+    args = parser.parse_args()
     executor = returnStudy()
-    # daily_twr_data = executor.construct_twr(start_date="10/01/2023", exchange=None)
-    daily_twr_data = executor.load_csv("account_data_fetcher/csv_db/daily_statistics.csv")
-    executor.save_to_csv(daily_twr_data, "account_data_fetcher/csv_db/daily_statistics.csv")
+
+    daily_statistics_path = "account_data_fetcher/csv_db/daily_statistics.csv"
+
+    if os.path.exists(os.path.join(executor.base_path, daily_statistics_path)):
+        print("Loading existing daily statistics...")
+        daily_twr_data = executor.load_csv(daily_statistics_path)
+        # Check if the loaded data includes the requested start date
+        if daily_twr_data.index.min() < pd.to_datetime(args.start_date, format='%d/%m/%Y'):
+            daily_twr_data = executor.construct_twr(start_date=args.start_date, exchange=None)
+    else:
+        print(f"Daily statistics file not found. Constructing data from {args.start_date}...")
+        daily_twr_data = executor.construct_twr(start_date=args.start_date, exchange=None)
+
+    executor.save_to_csv(daily_twr_data, daily_statistics_path)
 
     executor.plot_2d(daily_twr_data.index, daily_twr_data['daily_twr'])
