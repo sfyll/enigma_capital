@@ -7,25 +7,16 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from utils import find_project_root
+
 class returnStudy:
     def __init__(self):
         self.base_path, self.netliq_path, self.transactions_path = self.get_netliq_path()
         
     def get_netliq_path(self) -> str:
-        base = self.find_project_root()
+        base = find_project_root()
         return base, base + '/account_data_fetcher/csv_db/balance.csv', base + '/account_data_fetcher/csv_db/deposits_and_withdraws.csv'
 
-    def find_project_root(self) -> str:
-        """
-        Locate the project root by searching for the directory containing the 'env' folder.
-        """
-        current_path = os.path.realpath(os.path.dirname(__file__))
-        while current_path != '/':
-            if 'env' in os.listdir(current_path):
-                return current_path
-            current_path = os.path.dirname(current_path)
-        raise RuntimeError("Project root not found. Ensure the 'env' directory exists at the root.")
-        
     def construct_twr(self, start_date: str ='01/01/2023', exchange: Optional[str] = None):
         self.row_cache = pd.DataFrame()
         start_date = datetime.strptime(start_date, '%d/%m/%Y')
