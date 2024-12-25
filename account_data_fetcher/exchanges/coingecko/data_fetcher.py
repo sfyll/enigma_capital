@@ -28,7 +28,6 @@ class DataFetcher:
             method="get",
             args=params
         )
-
         price_per_symbol: Dict[str, Dict[str, float]] = {}
 
         for coin, price_dict in result.items():
@@ -71,13 +70,18 @@ class DataFetcher:
                 method="get",
                 args=params
             )
-
         id_per_symbol : Dict[str, str] = {}
         symbol_per_id : Dict[str, str] = {}
         for dictionary in result:
             if "dydx" == dictionary["id"].lower():
                 id_per_symbol["DYDX"] = dictionary["id"].upper()
                 symbol_per_id[dictionary["id"].upper()] = "DYDX" 
+            elif dictionary["symbol"].lower() == "vita":
+                if dictionary["id"].lower() == "vitadao":
+                    id_per_symbol["VITA"] = dictionary["id"].upper()
+                    symbol_per_id[dictionary["id"].upper()] = "VITA"
+                else:
+                    continue
             else:
                 id_per_symbol[dictionary["symbol"].upper()] = dictionary["id"].upper()
                 symbol_per_id[dictionary["id"].upper()] = dictionary["symbol"].upper()
