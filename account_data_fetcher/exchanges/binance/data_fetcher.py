@@ -157,10 +157,11 @@ class DataFetcher(ExchangeBase):
         df.to_csv(path)
 
     def fetch_balance(self, accountType: Optional[str] = None) -> float:
-        binance_balance: List[dict] = self.convert_balances_to_dollars(self.get_user_asset())
+        binance_balance: float = self.convert_balances_to_dollars(self.get_user_asset())
         binance_isolated_margin_balance = self.convert_isolated_margin_balance_to_dollars(self.get_isolated_margin_account())
+        margin_account_balance = self.convert_cross_margin_balance_to_dollars(self.get_margin_account())
 
-        return round(binance_balance + binance_isolated_margin_balance, 3)
+        return round(binance_balance + binance_isolated_margin_balance + margin_account_balance, 3)
 
     def fetch_specific_balance(self, accountType: str) -> float:
         if accountType == "SPOT":
@@ -171,6 +172,11 @@ class DataFetcher(ExchangeBase):
             return self.convert_isolated_margin_balance_to_dollars(binance_isolated_margin_balance)
         else:
             raise NotImplementedError(f"don't know accountType: {accountType} for balance")
+
+    def convert_cross_margin_balance_to_dollars(self, margin_balance_info: dict) -> float:
+        btc_usdt_price = float(self.get_latest_price("BTCUSDT")["price"])
+        net_asset_btc = float(margin_balance_info["totalNetAssetOfBtc"])
+        return round(net_asset_btc * btc_usdt_price, 2)
 
     def convert_balances_to_dollars(self, binance_balances: List[dict]) -> float:
         netliq_in_dollars = 0
