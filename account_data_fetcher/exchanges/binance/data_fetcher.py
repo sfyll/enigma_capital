@@ -189,7 +189,6 @@ class DataFetcher(ExchangeBase):
                     continue
                 elif "NFT" in asset_information['asset']:
                     continue
-                self.logger.info(f'{asset_information["asset"]=}')
                 price = float(self.get_latest_price(asset_information["asset"]+"USDT")["price"])
                 netliq_in_dollars += price * asset_amount
         return round(netliq_in_dollars,3)
