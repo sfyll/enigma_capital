@@ -21,7 +21,7 @@ class DataFetcher(ExchangeBase):
     def __init__(self, secrets: ApiMetaData, port_number: int, sub_account_name: Optional[str] = None) -> None:
         super().__init__(port_number, self._EXCHANGE)
         self._subaccount_name = sub_account_name
-        self._client = Spot(key=secrets.key, secret=secrets.secret, {recvWindow=10000})
+        self._client = Spot(base_url="https://api1.binance.com",api_key=secrets.key, api_secret=secrets.secret)
 
     def get_files_in_folder(self, path: str) -> list:
         onlyfiles = []
