@@ -1,4 +1,4 @@
-from datetime import timezone, datetime, timedelta
+from datetime import  datetime, timedelta
 import logging
 import os
 from requests.exceptions import ReadTimeout
@@ -8,10 +8,12 @@ from typing import Optional
 from ibflex import parser as ibparser
 from ibflex import client
 from ibflex.Types import OpenPosition, FlexQueryResponse, FlexStatement
-from ibflex.client import ResponseCodeError
+from ibflex.client import ResponseCodeError, request_statement, check_statement_response
 
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
+
+import requests
 
 class DataFetcher(ExchangeBase):
     __HOURS_DIFFERENCE_FROM_UTC = -5
@@ -100,31 +102,69 @@ class DataFetcher(ExchangeBase):
         return self.parse_data(data)
 
     def get_data(self, token, query_id):
-        counter: int = 0
-        data: Optional[bytes] = None
-        while not data:
-            if counter <= 20:
-                counter += 1
-                try:
-                    return client.download(token, query_id)
-                except ResponseCodeError as e:
-                    if int(e.code) == 1018:
-                        self.logger.debug(e)
-                        sleep(5)
-                        continue
-                    else:
-                        raise Exception(f"Unusual error {e}")
-                except ReadTimeout as e:
-                    self.logger.debug(e)
-                    sleep(15)
+        max_retries = 10 
+        for attempt in range(1, max_retries + 1):
+            try:
+                return self._request_statement_and_poll(token, query_id)
+            except ResponseCodeError as e:
+                # e.g. code 1018 means 'Statement generation in progress', we can sleep:
+                if int(e.code) == 1018:
+                    self.logger.debug(f"Got 1018 on attempt {attempt}. Sleeping before retry.")
+                    sleep(5 * attempt)
                     continue
+                else:
+                    raise Exception(f"Unusual error {e}")
+            except ReadTimeout as e:
+                self.logger.debug(f"ReadTimeout on attempt {attempt}, sleeping 15s: {e}")
+                sleep(15)
+                continue
+        raise Exception("Kept on getting errors beyond max_retries") 
+
+    def _request_statement_and_poll(self, token: str, query_id: str) -> bytes:
+        """
+        Implements the ibflex 2-step approach manually:
+          1) request_statement => get reference code & URL
+          2) poll until statement is ready
+        but with your own timeouts/retries to handle large statements.
+        """
+        # 1) Ask IB to start generating the statement
+        stmt_access = request_statement(token, query_id, url=client.REQUEST_URL)
+
+        # 2) Repeatedly request the statement data at the 'Url' with the reference code
+        poll_attempts = 0
+        while True:
+            poll_attempts += 1
+            # Build your GET:
+            url = stmt_access.Url or client.STMT_URL
+            params = {"v": "3", "t": token, "q": stmt_access.ReferenceCode}
+            headers = {"user-agent": "Java"}
+
+            # Example: extend the timeout drastically for large statements
+            try:
+                # e.g. 30s * poll_attempts for a bit of dynamic backoff
+                resp = requests.get(url, params=params, headers=headers, timeout=(30 * poll_attempts))
+            except requests.exceptions.Timeout:
+                # You can either break or raise, or keep trying
+                if poll_attempts >= 6:
+                    raise
+                self.logger.warning(f"Timeout on poll attempt {poll_attempts}, re-trying in 10s.")
+                sleep(10)
+                continue
+
+            # 3) Check the response
+            result = check_statement_response(resp)
+            if result is True:
+                # means `resp.content` is the real flex data
+                return resp.content
             else:
-                raise Exception("Kept on getting errors")
-    
-    
+                # means IB told us "not ready yet" or "throttled" -> result is how many seconds to wait
+                wait_seconds = result
+                self.logger.debug(f"Statement not ready; waiting {wait_seconds}s (attempt {poll_attempts}).")
+                # If you want to increase or cap wait_seconds, do so here
+                sleep(wait_seconds)
+
     def parse_data(self, data) -> FlexQueryResponse:
-        cleansed_data = ibparser.parse(data)
-        return cleansed_data
+        return ibparser.parse(data)
 
 if __name__ == '__main__':
     from getpass import getpass
