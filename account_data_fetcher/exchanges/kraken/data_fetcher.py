@@ -55,7 +55,7 @@ class DataFetcher(ExchangeBase):
     _ENDPOINT = 'https://api.kraken.com'
     __KRAKEN_TICKER_TO_OTHERS = {
         'ZEUR': 'EUR',
-        'USDC': 'USDC',
+        'USDC': 'USD',
         'GNO': 'GNO',
         'XXBT': 'BTC',
         'XICN': 'ICN',
@@ -115,7 +115,10 @@ class DataFetcher(ExchangeBase):
 
         for token, balance in balances.items():
             if token in ["USDC", "USDT", "DAI", "USD", "ZUSD"]:
-                dollar_balances["USD"] = float(balance)
+                if "USD" in dollar_balances:
+                    dollar_balances["USD"] += float(balance)
+                else:
+                    dollar_balances["USD"] = float(balance)
             elif token in self.__INTERNAL_KRAKEN_MAP:
                 dollar_balances[self.__KRAKEN_TICKER_TO_OTHERS[token]] = float(balance) * self.__get_coin_price(self.__INTERNAL_KRAKEN_MAP[token], prices)
             else:
