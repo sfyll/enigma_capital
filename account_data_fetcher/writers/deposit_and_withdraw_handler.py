@@ -1,7 +1,7 @@
 import csv
 import dataclasses
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, UTC
 import os
 from os import listdir
 from os.path import isfile, join, getsize
@@ -14,15 +14,21 @@ class DepositAndWithdraw:
 
     Attributes:
         date (str): Date of the transaction.
+        type (str): The type of transaction (e.g., DEPOSIT, WITHDRAWAL, INTERNAL_TRANSFER).
         from_exchange (Optional[str]): The exchange the money was withdrawn from.
         to_exchange (Optional[str]): The exchange the money was deposited to.
         amount (float): The transaction amount.
+        investor (str): The investor associated with the transaction.
+        trade_id (Optional[str]): Optional trade ID for the transaction.
         comment (Optional[str]): Optional comment.
     """
     date: str
+    type: str
     from_exchange: Optional[str]
     to_exchange: Optional[str]
     amount: float
+    investor: str
+    trade_id: Optional[str]
     comment: Optional[str]
 
     def write_dataclass_to_csv(self, path: str, file_name: str= "deposits_and_withdraws.csv") -> None:
@@ -81,9 +87,12 @@ class depositAndWithdrawHandler:
         Returns:
             str: The base directory path.
         """
-        current_directory = os.path.dirname(__file__)
-        return os.path.abspath(os.path.join(current_directory, '..', '..'))
-        
+        try:
+            current_directory = os.path.dirname(__file__)
+            return os.path.abspath(os.path.join(current_directory, '..', '..'))
+        except NameError: 
+            return os.path.abspath(os.path.join(os.getcwd(), '..', '..'))
+
     def __get_data(self) -> DepositAndWithdraw:
         """
         Collects data from user input and creates a DepositAndWithdraw object.
@@ -91,12 +100,33 @@ class depositAndWithdrawHandler:
         Returns:
             DepositAndWithdraw: A filled DepositAndWithdraw dataclass.
         """
+        date = self.get_date()
+        from_exchange = self.get_from_exchange()
+        to_exchange = self.get_to_exchange()
+        amount = self.get_user_amount()
+        investor = self.get_investor()
+        trade_id = self.get_trade_id()
+        comment = self.get_comment()
+
+        if from_exchange and to_exchange:
+            transaction_type = "INTERNAL_TRANSFER"
+        elif to_exchange and not from_exchange:
+            transaction_type = "DEPOSIT"
+        elif from_exchange and not to_exchange:
+            transaction_type = "WITHDRAWAL"
+            amount = -amount
+        else:
+            raise ValueError("Invalid transaction: at least one of 'from_exchange' or 'to_exchange' must be provided.")
+
         return DepositAndWithdraw(
-            date=self.get_date(),
-            from_exchange=self.get_from_exchange(),
-            to_exchange=self.get_to_exchange(),
-            amount=self.get_user_amount(),
-            comment=self.get_comment()
+            date=date,
+            type=transaction_type,
+            from_exchange=from_exchange,
+            to_exchange=to_exchange,
+            amount=amount,
+            investor=investor,
+            trade_id=trade_id,
+            comment=comment
         )
 
     def get_date(self) -> datetime:
@@ -108,7 +138,7 @@ class depositAndWithdrawHandler:
         """
         date: Optional[str] = input("If the transaction is not from today, specify the date in dd/mm/yyy format, otherwise press enter and it'll get generated automatically \n")
         if not date:
-            date = datetime.utcnow().strftime('%d/%m/%Y')
+            date = datetime.now(UTC).strftime('%d/%m/%Y')
         else:
             if not self.is_valid_date(date, "%d/%m/%Y"):
                 raise ValueError("Please provide a valid date")
@@ -154,7 +184,7 @@ class depositAndWithdrawHandler:
         Returns:
             Optional[str]: The name of the exchange or None.
         """
-        to_exchange: Optional[str] = input("Please insert from to exchange you deposited. If None (money outflow), press enter \n")
+        to_exchange: Optional[str] = input("Please insert to which exchange you deposited. If None (money outflow), press enter \n")
         if not to_exchange:
             return None
         else:
@@ -173,8 +203,30 @@ class depositAndWithdrawHandler:
         Notes:
             Withdrawals = negatif, deposits = positifs
         """
-        amount: str = input("Please insert the amount you deposited or withdrawn. If withdrawn, include a - sign \n")
-        return float(amount)
+        amount: str = input("Please insert the transaction amount (as a positive number, e.g., 500.25) \n")
+        return abs(float(amount))
+
+    def get_investor(self) -> str:
+        """
+        Gets the investor's name from user input.
+        
+        Returns:
+            str: The investor's name.
+        """
+        investor: str = input("Please insert the investor's name for this transaction \n")
+        if not investor:
+            raise ValueError("Investor name cannot be empty.")
+        return investor
+
+    def get_trade_id(self) -> Optional[str]:
+        """
+        Gets an optional trade ID from the user.
+        
+        Returns:
+            Optional[str]: The trade ID or None.
+        """
+        trade_id: str = input("If there is a trade_id associated with this transaction, please provide it. Otherwise, press enter \n")
+        return trade_id if trade_id else None
 
     def get_comment(self) -> str:
         """
@@ -187,4 +239,8 @@ class depositAndWithdrawHandler:
         return comment
     
 if __name__ == "__main__":
-    depositAndWithdrawHandler()
+    try:
+        depositAndWithdrawHandler()
+    except (ValueError, NotImplementedError) as e:
+        print(f"Error: {e}")
+
