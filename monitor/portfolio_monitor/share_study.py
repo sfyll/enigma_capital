@@ -78,33 +78,36 @@ class Portfolio:
 
             cash_flows = self.cash_flow_data[self.cash_flow_data['date'] == date]
             for idx, row in cash_flows.iterrows():
-                investor_name = row['investor'].strip() if pd.notnull(row['investor']) else self.fund_owner_name
+                # Read the transaction type directly from the new column
+                transaction_type = row['type'].strip().upper()
+                investor_name = row['investor'].strip().lower()
                 amount = row['amount']
-
-                if investor_name.lower() == 'fund':
+                
+                # We only process DEPOSIT and WITHDRAWAL types for unit calculations.
+                # All other types (INVEST, REALIZE, INTERNAL_FLOW) are fund-internal
+                # and do not affect unit counts.
+                if transaction_type not in ['DEPOSIT', 'WITHDRAWAL']:
                     continue
 
-                if investor_name != self.fund_owner_name and investor_name not in self.investors:
-                    multi_investor_mode = True
+                # It's an external capital flow, add investor if new
+                if investor_name not in self.investors:
                     self.add_investor(investor_name)
-                    print(f"[Mode Switch] Multiple investors detected from date {date.strftime('%Y-%m-%d')}")
+                    # Check if we are now in multi-investor mode
+                    if len(self.investors) > 1:
+                        multi_investor_mode = True
+                        print(f"[Mode Switch] Multiple investors detected from date {date.strftime('%Y-%m-%d')}")
 
-                is_deposit = pd.isnull(row['from_exchange']) and pd.notnull(row['to_exchange'])
-                is_withdrawal = pd.notnull(row['from_exchange']) and pd.isnull(row['to_exchange'])
-
-                if is_deposit:
+                # Calculate unit changes based on the explicit type
+                if transaction_type == 'DEPOSIT':
                     units = amount / nav
-                elif is_withdrawal:
-                    units = -amount / nav
-                else:
-                    # Skip invalid transactions
-                    continue
-
-                if not multi_investor_mode:
-                    self.investors[self.fund_owner_name].update_units(date, units)
-                else:
-                    self.add_investor(investor_name)
-                    self.investors[investor_name].update_units(date, units)
+                elif transaction_type == 'WITHDRAWAL':
+                    # For withdrawals, the amount is negative in the CSV. 
+                    # We need a positive number of units to subtract.
+                    units = amount / nav # e.g. -10700 / 1.05 = -10190 units
+                
+                # Update units for the correct investor
+                target_investor = investor_name if multi_investor_mode else self.fund_owner_name
+                self.investors[target_investor].update_units(date, units)
 
                 self.total_units += units
                 print(f"[Total Units Update] {date.strftime('%Y-%m-%d')}: Total Units = {self.total_units}")
@@ -211,6 +214,37 @@ class Portfolio:
         ax_inset.legend()
 
         plt.show()
+
+    def plot_shares_stacked(self):
+        """
+        Generates a stacked area chart to show ownership percentages over time.
+        This is a clearer way to visualize shares than a dual-axis plot.
+        """
+        print("\nGenerating stacked ownership chart...")
+        fig, ax = plt.subplots(figsize=(14, 7))
+
+        # Get the columns that represent each investor's share
+        share_cols = [col for col in self.shares_df.columns if col.endswith('_share')]
+        investor_names = [col.replace('_share', '') for col in share_cols]
+        
+        # Extract the share data and the dates for plotting
+        share_data = self.shares_df[share_cols].T
+        share_data.index = investor_names
+        dates = self.shares_df['date']
+
+        # Create the stacked area plot
+        ax.stackplot(dates, share_data, labels=investor_names, alpha=0.8)
+
+        # Formatting the plot for clarity
+        ax.set_title('Ownership Shares Over Time (Stacked View)')
+        ax.set_ylabel('Ownership Percentage')
+        ax.set_xlabel('Date')
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.1%}')) # Format y-axis as percentage
+        ax.set_ylim(0, 1) # Y-axis from 0% to 100%
+
+        plt.tight_layout()
+        plt.show()
  
     def save_results(self, output_path):
         self.shares_df.to_csv(os.path.join(output_path, 'ownership_shares.csv'), index=False)
@@ -263,6 +297,7 @@ def main():
     
     portfolio.plot_shares()
     portfolio.plot_shares_with_inset()
+    portfolio.plot_shares_stacked()
 
     portfolio.update_to_latest_netliq()
 
