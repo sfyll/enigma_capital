@@ -1,7 +1,7 @@
 import csv
 import dataclasses
 from dataclasses import asdict
-from datetime import datetime, UTC
+from datetime import datetime, timezone 
 import os
 from os import listdir
 from os.path import isfile, join, getsize
@@ -138,7 +138,7 @@ class depositAndWithdrawHandler:
         """
         date: Optional[str] = input("If the transaction is not from today, specify the date in dd/mm/yyy format, otherwise press enter and it'll get generated automatically \n")
         if not date:
-            date = datetime.now(UTC).strftime('%d/%m/%Y')
+            date = datetime.now(timezone.utc).strftime('%d/%m/%Y')
         else:
             if not self.is_valid_date(date, "%d/%m/%Y"):
                 raise ValueError("Please provide a valid date")
