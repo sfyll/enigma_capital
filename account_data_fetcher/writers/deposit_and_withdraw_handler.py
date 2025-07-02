@@ -14,7 +14,7 @@ class DepositAndWithdraw:
 
     Attributes:
         date (str): Date of the transaction.
-        type (str): The type of transaction (e.g., DEPOSIT, WITHDRAWAL, INTERNAL_TRANSFER).
+        type (str): The type of transaction (e.g., DEPOSIT, WITHDRAWAL, INTERNAL_TRANSFER, REALIZE).
         from_exchange (Optional[str]): The exchange the money was withdrawn from.
         to_exchange (Optional[str]): The exchange the money was deposited to.
         amount (float): The transaction amount.
@@ -103,20 +103,14 @@ class depositAndWithdrawHandler:
         date = self.get_date()
         from_exchange = self.get_from_exchange()
         to_exchange = self.get_to_exchange()
+        transaction_type = self.get_transaction_type(from_exchange, to_exchange)
         amount = self.get_user_amount()
         investor = self.get_investor()
         trade_id = self.get_trade_id()
         comment = self.get_comment()
 
-        if from_exchange and to_exchange:
-            transaction_type = "INTERNAL_TRANSFER"
-        elif to_exchange and not from_exchange:
-            transaction_type = "DEPOSIT"
-        elif from_exchange and not to_exchange:
-            transaction_type = "WITHDRAWAL"
+        if transaction_type == "WITHDRAWAL":
             amount = -amount
-        else:
-            raise ValueError("Invalid transaction: at least one of 'from_exchange' or 'to_exchange' must be provided.")
 
         return DepositAndWithdraw(
             date=date,
@@ -128,6 +122,35 @@ class depositAndWithdrawHandler:
             trade_id=trade_id,
             comment=comment
         )
+
+    def get_transaction_type(self, from_exchange: Optional[str], to_exchange: Optional[str]) -> str:
+        """
+        Determines the transaction type, prompting the user if ambiguity exists.
+
+        Args:
+            from_exchange (Optional[str]): The source exchange.
+            to_exchange (Optional[str]): The destination exchange.
+
+        Returns:
+            str: The final transaction type (DEPOSIT, WITHDRAWAL, REALIZE, INTERNAL_TRANSFER).
+        """
+        if from_exchange and to_exchange:
+            return "INTERNAL_TRANSFER"
+        
+        if from_exchange and not to_exchange:
+            return "WITHDRAWAL"
+
+        if to_exchange and not from_exchange:
+            while True:
+                inflow_type = input("Is this inflow a (1) DEPOSIT of new capital or (2) REALIZE from a sale? [1/2] \n")
+                if inflow_type == '1':
+                    return "DEPOSIT"
+                elif inflow_type == '2':
+                    return "REALIZE"
+                else:
+                    print("Invalid input. Please enter '1' or '2'.")
+        
+        raise ValueError("Invalid transaction: at least one of 'from_exchange' or 'to_exchange' must be provided.")
 
     def get_date(self) -> datetime:
         """
