@@ -1,3 +1,4 @@
+import asyncio
 import dataclasses
 from datetime import datetime, timedelta
 import logging
@@ -7,6 +8,7 @@ from typing import Dict, Optional
 from account_data_fetcher.exchanges.kraken.kraken_connector import krakenApiConnector
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
+import aiohttp
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class balanceMetaData:
@@ -77,31 +79,53 @@ class DataFetcher(ExchangeBase):
         "XXBT":"XBTC",
     }
     __NO_PRICE_MAP = ["ZGBP", "ZEUR"]
-    def __init__(self, secrets: ApiMetaData, port_number: int, sub_account_name: Optional[str] = None) -> None:
-        super().__init__(port_number, self._EXCHANGE)
+    def __init__(
+        self, 
+        secrets: ApiMetaData, 
+        session: aiohttp.ClientSession,
+        output_queue: asyncio.Queue,
+        fetch_frequency: int,
+        sub_account_name: Optional[str] = None
+    ) -> None:
+        """
+        Initializes the Kraken DataFetcher.
+
+        Args:
+            secrets (ApiMetaData): The API keys and secrets for Kraken.
+            session (aiohttp.ClientSession): The shared HTTP client session.
+            output_queue (asyncio.Queue): The queue to send fetched data to.
+            fetch_frequency (int): The interval in seconds between data fetches.
+            sub_account_name (Optional[str], optional): A specific sub-account name if any.
+        """
+        super().__init__(
+            exchange=self._EXCHANGE, 
+            session=session, 
+            output_queue=output_queue,
+            fetch_frequency=fetch_frequency
+        )
         self.logger = logging.getLogger(__name__) 
         self._subaccount_name = sub_account_name
-        self.kraken_connector = krakenApiConnector(api_key=secrets.key, api_secret=secrets.secret)
+        self.kraken_connector = krakenApiConnector(api_key=secrets.key, api_secret=secrets.secret, session=session)
         self.balance_meta_data: Optional[balanceMetaData] = None
 
-    def fetch_balance(self, accountType: str = "SPOT") -> float:
-        self.__update_balances(accountType)
+    async def fetch_balance(self, accountType: str = "SPOT") -> float:
+        await self.__update_balances(accountType)
         return self.balance_meta_data.get_netliq()
     
-    def __update_balances(self, account_type: str = "SPOT") -> None:
+    async def __update_balances(self, account_type: str = "SPOT") -> None:
         if account_type == "SPOT":
-            self.__check_and_update_balances()
+            await self.__check_and_update_balances()
         else:
             raise NotImplementedError
 
-    def __check_and_update_balances(self, delta_in_seconds: int = 120) -> balanceMetaData:
+    async def __check_and_update_balances(self, delta_in_seconds: int = 120) -> balanceMetaData:
         if self.balance_meta_data:
             if self.balance_meta_data.is_acceptable_timestamp_detla(delta_in_seconds):
                 return self.balance_meta_data.balance_per_coin
 
-        balance_per_coin = self.filter_balance_dict(self.kraken_connector.get_balance())
+        balance_per_coin = self.filter_balance_dict(await self.kraken_connector.get_balance())
         
-        balance_per_coin_dollar = self.get_balance_per_ticker_in_dollars(balance_per_coin)
+        balance_per_coin_dollar = await self.get_balance_per_ticker_in_dollars(balance_per_coin)
         
         self.balance_meta_data: balanceMetaData = balanceMetaData(
             timestamp=datetime.utcnow(),
@@ -109,9 +133,9 @@ class DataFetcher(ExchangeBase):
             balance_per_coin_in_dollars=balance_per_coin_dollar
         )
         
-    def get_balance_per_ticker_in_dollars(self, balances: dict) -> dict:
+    async def get_balance_per_ticker_in_dollars(self, balances: dict) -> dict:
         dollar_balances: dict = {}
-        prices: dict = self.kraken_connector.get_ticker()
+        prices: dict = await self.kraken_connector.get_ticker()
 
         for token, balance in balances.items():
             if token in ["USDC", "USDT", "DAI", "USD", "ZUSD"]:
@@ -147,8 +171,8 @@ class DataFetcher(ExchangeBase):
 
         return balances
 
-    def fetch_positions(self, accountType: str = "SPOT") -> dict:
-        self.__update_balances(accountType)
+    async def fetch_positions(self, accountType: str = "SPOT") -> dict:
+        await self.__update_balances(accountType)
         return self.balance_meta_data.get_position()
     
     @staticmethod
@@ -167,10 +191,3 @@ class DataFetcher(ExchangeBase):
             return float(price_dict[coin+"USDC"]["c"][0])
         except KeyError:
             pass
-
-if __name__ == "__main__":
-    from getpass import getpass
-    pwd = getpass("provide password for pk:")
-    executor = krakenDataFetcher(os.path.realpath(os.path.dirname(__file__)), pwd)
-    print(executor.get_netliq())
-    print(executor.get_positions())

@@ -1,25 +1,25 @@
+import asyncio
 import base64
 from datetime import datetime as dt
 import hashlib
 import hmac
 from json.decoder import JSONDecodeError
 import logging
-from requests.exceptions import ReadTimeout, SSLError, ConnectionError
-from requests import Response
 import time
-import urllib
+import urllib.parse
 from typing import List, Optional
+import json
 
+import aiohttp 
 from account_data_fetcher.exchanges.kraken.exception import InvalidRequestError, FailedRequestError
-from utilities.request_handler import requestHandler
 
 class krakenApiConnector:
     __ENDPOINT="https://api.kraken.com"
     
-    def __init__(self, api_key: str, api_secret: str, max_retries: int = 10, 
+    def __init__(self, api_key: str, api_secret: str, session: aiohttp.ClientSession, max_retries: int = 10, 
                 force_retry: bool = True, retry_delay: int = 3, retry_codes: Optional[set] = None) -> None:
         self.logger = logging.getLogger(__name__) 
-        self.__request_handler: requestHandler = requestHandler()
+        self.session = session
         self.api_key: str = api_key
         self.api_secret: str = api_secret
         self.max_retries: int = max_retries
@@ -28,16 +28,15 @@ class krakenApiConnector:
 
         # Set whitelist of non-fatal Bybit status codes to retry on.
         if retry_codes is None:
-            start = "EOrder:"
-            self.retry_codes = {start+"Rate limit exceeded",}
+            self.retry_codes = {"EOrder:Rate limit exceeded"}
         else:
             self.retry_codes = retry_codes
 
 
-    def get_balance(self, **kwargs) -> List[dict]:
+    async def get_balance(self, **kwargs) -> List[dict]:
         module = "/0/private/Balance"
             
-        response = self.__prepare_and_handle_request(
+        response = await self.__prepare_and_handle_request(
             method="post",
             path_extension=module,
             req_params=kwargs,
@@ -45,10 +44,10 @@ class krakenApiConnector:
         
         return response["result"]
 
-    def get_ticker(self, **kwargs)-> dict[str, str]:
+    async def get_ticker(self, **kwargs)-> dict[str, str]:
         module = "/0/public/Ticker"
                 
-        response = self.__prepare_and_handle_request(
+        response = await self.__prepare_and_handle_request(
             method="get",
             path_extension=module,
             req_params=kwargs,
@@ -76,110 +75,61 @@ class krakenApiConnector:
         sigdigest = base64.b64encode(mac.digest())
         return sigdigest.decode()
 
-    def __prepare_and_handle_request(self, method: str, path_extension: str, req_params: dict, is_private: bool = True):
-
-        # Send request and return headers with body. Retry if failed.
+    async def __prepare_and_handle_request(self, method: str, path_extension: str, req_params: dict, is_private: bool = True):
         retries_attempted = self.max_retries
+        url = self.__ENDPOINT + path_extension
 
         while True:
+            headers = None
             if is_private:
                 req_params["nonce"] = self.__get_utc_timestamp_milliseconds()
                 headers = self.__generate_headers(req_params, path_extension)
             
-            url = self.__ENDPOINT + path_extension
-
             retries_attempted -= 1
             if retries_attempted < 0:
                 raise FailedRequestError(
                     request=f'{method} {path_extension}: {req_params}',
                     message='Bad Request. Retries exceeded maximum.',
-                    status_code=400,
                     time=dt.utcnow().strftime("%H:%M:%S")
                 )
 
             try:
-                if is_private:
-                    raw_response: Response = self.__request_handler.handle_requests(
-                        url=url,
-                        method=method,
-                        args=req_params,
-                        headers=headers,
-                        raw_response=True
-                    )
-                else:
-                    raw_response: Response = self.__request_handler.handle_requests(
-                        url=url,
-                        method=method,
-                        args=req_params,
-                        raw_response=True
-                    )
-
-            except (
-                ReadTimeout,
-                SSLError,
-                ConnectionError
-            ) as e:
+                # Use aiohttp session for the request
+                async with self.session.request(method, url, data=req_params if method == 'post' else None, params=req_params if method == 'get' else None, headers=headers) as raw_response:
+                    response_text = await raw_response.text()
+                    response = json.loads(response_text)
+            
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 if self.force_retry:
-                    self.logger.error(f'{e}. {retries_attempted}')
-                    time.sleep(self.retry_delay)
+                    self.logger.error(f'{e}. Retrying in {self.retry_delay}s... ({retries_attempted} retries left)')
+                    await asyncio.sleep(self.retry_delay)
                     continue
                 else:
                     raise e
-
-            try:
-                response = raw_response.json()
-
-            # If we have trouble converting, handle the error and retry.
             except JSONDecodeError as e:
                 if self.force_retry:
-                    self.logger.error(f'{e}. {retries_attempted}')
-                    time.sleep(self.retry_delay)
+                    self.logger.error(f'JSONDecodeError: {e}. Response: "{response_text}". Retrying...')
+                    await asyncio.sleep(self.retry_delay)
                     continue
                 else:
                     raise FailedRequestError(
                         request=f'{method} {url}: {req_params}',
                         message='Conflict. Could not decode JSON.',
-                        status_code=409,
                         time=dt.utcnow().strftime("%H:%M:%S")
                     )
-            if response['error']:
 
-                    # Generate error message.
-                    error_msg = (
-                        f'{response["error"]})'
-                    )
-
-                    # Retry non-fatal whitelisted error requests.
-                    if response['error'][0] in self.retry_codes:
-
-                        # 10002, recv_window error; add 2.5 seconds and retry.
-                        if response['error'][0] == 10002:
-                            error_msg += '. Added 2.5 seconds to recv_window'
-                            self.__X_BAPI_RECV_WINDOW = str(int(self.__X_BAPI_RECV_WINDOW) + 2500)
-
-                        # 10006, ratelimit error; wait until rate_limit_reset_ms
-                        # and retry.
-                        elif "Rate limit exceeded" in response['error'][0]:
-                            self.logger.error(
-                                f'{response["error"]}. Ratelimited on current request. '
-                                f'Sleeping, then trying again. Request: {url}'
-                            )
-
-                            # Calculate how long we need to wait.
-                            limit_reset = response['rate_limit_reset_ms'] / 1000
-                            reset_str = time.strftime(
-                                '%X', time.localtime(limit_reset)
-                            )
-                            err_delay = int(limit_reset) - int(time.time())
-                            error_msg = (
-                                f'Ratelimit will reset at {reset_str}. '
-                                f'Sleeping for {err_delay} seconds'
-                            )
-
+            if response.get('error'):
+                error_list = response['error']
+                if error_list:
+                    # Handle rate limits and other retryable errors
+                    if any(e in self.retry_codes for e in error_list):
+                        self.logger.error(f"Retryable error: {error_list}. Retrying...")
+                        await asyncio.sleep(self.retry_delay) # Simple delay, can be enhanced
+                        continue
                     else:
                         raise InvalidRequestError(
                             request=f'{method} {url}: {req_params}',
-                            message=response["error"][0],
+                            message=str(error_list),
                             time=dt.utcnow().strftime("%H:%M:%S")
                         )
             else:

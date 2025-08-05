@@ -1,44 +1,13 @@
+import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-import json
+from datetime import datetime
 import logging
-import logging.config
-import os
 import time
 from typing import Dict, List, Optional, Set
 
 from setproctitle import setproctitle
-import zmq
 
 from infrastructure.log_handler import fetch_logging_config
-
-@dataclass
-class Subscription:
-    """
-    Class to hold the subscription data for a route.
-
-    Attributes:
-        port_number (str): The port number to use for this subscription.
-        topic (Optional[Set[str]]): Optional topic for data filtering.
-    """
-    port_number: str
-    topic: Optional[Set[str]] = None
-
-@dataclass
-class DataAggregatorConfig:
-    """
-    Configuration for the Data Aggregator.
-
-    Attributes:
-        fetcher_routes (Dict[str, Subscription]): Mapping of exchange names to subscriptions for fetchers.
-        writer_routes (Dict[str, Subscription]): Mapping of writer types to subscriptions for writers.
-        data_aggregator_port_number (int): Port number for the Data Aggregator.
-        aggregation_interval (int): Time interval for data aggregation, in seconds.
-    """
-    fetcher_routes: Dict[str, Subscription]  # Mapping of exchange name to port_numbers for subscribing to fetchers
-    writer_routes: Dict[str, Subscription]   # Mapping of writer type to port_numbers for publishing to writers
-    data_aggregator_port_number: int
-    aggregation_interval: int
 
 @dataclass
 class BalanceData:
@@ -135,7 +104,7 @@ class AggregatedData:
         exchanges (Dict[str, ExchangeData]): Data for individual exchanges.
     """
     aggregation_interval: int
-    data_routes: DataAggregatorConfig
+    expected_exchanges: Set[str]
     netliq: float = 0
     date: str = None
     exchanges: Dict[str, ExchangeData] = field(default_factory=dict)
@@ -158,18 +127,13 @@ class AggregatedData:
         Returns:
             bool: True if data can be sent, False otherwise.
         """
-        if set(self.data_routes.fetcher_routes.keys()) <= set(self.exchanges.keys()) :
-            pass
-        else:
+        if not self.expected_exchanges.issubset(self.exchanges.keys()):
             return False
 
         #if aggregation interval == 24h, we're assuming we want to post on new day as defined by IB
         if self.aggregation_interval == 86400:
-            if not self.__is_new_day():
-                return False
-            else:
-                return True
-
+            return self.__is_new_day()
+        
         #if process was just launched, no need to check for all fetchers to have a new date
         if not self.date:
             return True
@@ -234,19 +198,15 @@ class DataAggregator:
     Attributes:
         aggregated_data (AggregatedData): Data to be aggregated and sent.
     """
-    def __init__(self, config: DataAggregatorConfig) -> None:
-        """Initializes DataAggregator class with configurations.
-        
-        Args:
-            config (DataAggregatorConfig): The configuration settings for the data aggregator.
-        """
+    def __init__(self, aggregation_interval: int, input_queues: Dict[str, asyncio.Queue], output_queues: Dict[str, asyncio.Queue]) -> None:
         setproctitle("data_aggregator")
         self.logger = self.init_logging()
-        self.path = os.path.realpath(os.path.dirname(__file__))
-        self.aggregated_data = self.aggregated_data = AggregatedData(aggregation_interval=config.aggregation_interval, 
-                                                                     date="", 
-                                                                     exchanges={}, 
-                                                                     data_routes=config)
+        self.input_queues = input_queues
+        self.output_queues = output_queues
+        self.aggregated_data = AggregatedData(
+            aggregation_interval=aggregation_interval,
+            expected_exchanges=set(input_queues.keys())
+        )
 
     def init_logging(self):
         """Initializes logging for the class.
@@ -256,81 +216,43 @@ class DataAggregator:
         """
         fetch_logging_config('/account_data_fetcher/config/logging_config.ini')
         return logging.getLogger(__name__)
-    
-    def run(self):
-        """
-        The main method that handles the data aggregation and publication.
-        
-        This method performs the following operations:
-        1. Initializes the ZeroMQ context.
-        2. Creates and binds a publisher socket for sending aggregated data.
-        3. Creates and connects a subscriber socket for receiving data from various exchanges.
-        4. Enters an infinite loop that:
-            a. Receives data from the subscriber socket.
-            b. Updates the internal aggregated data structure.
-            c. Sends the aggregated data through the publisher socket when ready. That is, when all exchanges have been published and aggregation interval has been met.
-        
-        Note: 
-        - The ZMQ PUB-SUB model is being used here. The publisher (PUB) will send data to any
-        connected subscriber (SUB).
-        - This method assumes that each message received from a subscriber contains both 
-        balance and position data, identified by an "exchange" field.
-        """
-        context = zmq.Context()
 
-        # Create and bind the publisher for the writers
-        self.logger.debug(f"Publishing data_aggregator at tcp://localhost:{self.aggregated_data.data_routes.data_aggregator_port_number}")
-        pub_socket = context.socket(zmq.PUB)
-        pub_socket.bind(f"tcp://*:{self.aggregated_data.data_routes.data_aggregator_port_number}")
-
-        # Create and connect the subscriber for the fetchers
-        sub_socket = context.socket(zmq.SUB)
-        for exchange_name, exchange_subscription in self.aggregated_data.data_routes.fetcher_routes.items():
-            self.logger.debug(f"Subscribing data_aggregator to {exchange_name} at tcp://localhost:{exchange_subscription['port_number']}")
-            sub_socket.connect(f"tcp://localhost:{exchange_subscription['port_number']}")
-            #TODO: Be able to subscribe to different topics, so that the data_aggregator can scale easily to more usecases
-            sub_socket.setsockopt_string(zmq.SUBSCRIBE, "")
-            # for topic in exchange_subscription["topic"]:
-            #     sub_socket.subscribe(topic)
-
-        #TODO: Handle failure. What if an exchange stop publishing and we just loop forever? Need some form of heartbit logic.
-        #TODO: Make the function more modular, the data_aggregator should be agnostic to what data is being aggregated as that should be abstracted away.
+    async def _queue_consumer(self, exchange_name: str, queue: asyncio.Queue):
+        """A wrapper coroutine to consume from a queue and yield the source."""
         while True:
-            _, data = sub_socket.recv_multipart()
-            balance_and_positions_dict = json.loads(data.decode())
-            exchange_name = balance_and_positions_dict.pop("exchange")
+            data = await queue.get()
+            yield exchange_name, data
 
-            self.logger.debug(f"Received {exchange_name=}, {data=}")
+    async def run(self):
+        """
+        Main method to aggregate data from input queues and publish to output queues.
+        """
+        consumers = [self._queue_consumer(name, queue) for name, queue in self.input_queues.items()]
+        
+        try:
+            while True:
+                tasks: List[asyncio.Task] = [asyncio.create_task(consumer.__anext__()) for consumer in consumers]
+                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                
+                for task in done:
+                    exchange_name, data = task.result()
+                    self.logger.debug(f"Received from {exchange_name=}, {data=}")
 
-            if exchange_name not in self.aggregated_data.exchanges:
-                self.aggregated_data.exchanges[exchange_name] = ExchangeData(
-                    balance=BalanceData(value=balance_and_positions_dict['balance']),
-                    position=PositionData(data=balance_and_positions_dict['positions']),
-                    last_fetch_timestamp=time.time()
-                )
+                    if exchange_name not in self.aggregated_data.exchanges:
+                        empty_positions = {k: [] for k in ["Symbol", "Multiplier", "Quantity", "Dollar Quantity"]}
+                        self.aggregated_data.exchanges[exchange_name] = ExchangeData(position=PositionData(data=empty_positions))
+                    
+                    self.aggregated_data.exchanges[exchange_name].update(data)
+                    
+                    objects_to_send = self.aggregated_data.get_object_if_ready()
+                    if objects_to_send:
+                        self.logger.debug(f"Aggregated object ready. Pushing to {len(self.output_queues)} writers.")
+                        await asyncio.gather(*(q.put(objects_to_send) for q in self.output_queues.values()))
+                
+                # Re-add pending tasks for the next iteration
+                tasks = [asyncio.create_task(consumer.__anext__()) for consumer in consumers if consumer.__anext__() in pending]
 
-            else:
-                self.aggregated_data.exchanges[exchange_name].update(balance_and_positions_dict)
-            objects_to_send: Optional[dict] = self.aggregated_data.get_object_if_ready()
-            if objects_to_send:
-                self.logger.debug(f"Sending {objects_to_send=}")
-                pub_socket.send_multipart([b"balance_and_positions", json.dumps(objects_to_send).encode()])
-
-if __name__ == '__main__':
-    import argparse
-    import logging
-
-    #TODO: Properly parse the object below so that the inner dataclass can be read as a dataclass, and not accessed as a dict
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--kwargs")
-    args = parser.parse_args()
-    kwargs_dict = json.loads(args.kwargs)
-    data_aggregator_config_raw = json.loads(kwargs_dict["data-aggregator-config"])
-    data_aggregator_config = DataAggregatorConfig(**data_aggregator_config_raw)
-
-    executor = DataAggregator(data_aggregator_config)
-
-    executor.run()
-
-
-
+        except asyncio.CancelledError:
+            self.logger.info("Data aggregator is shutting down.")
+        except Exception as e:
+            self.logger.error(f"DataAggregator failed: {e}", exc_info=True)

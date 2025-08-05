@@ -42,7 +42,7 @@ class ProcessFactoryBase(ABC):
 
     #TODO: Process request is the only entry-point at the factory level. This could be made more generic to accomodate for other entry-points and inputs as the application scales.
     @classmethod
-    def launch_process_and_run_request_processor(cls, process_name: str, *args, **kwargs) -> None:
+    async def launch_process_and_run_request_processor(cls, process_name: str, *args, **kwargs) -> None:
         """
         Instantiates the process class and runs its request processor method.
 
@@ -58,7 +58,7 @@ class ProcessFactoryBase(ABC):
         
         launched_instance = process_instance(*args, **filtered_kwargs)
 
-        launched_instance.process_request()
+        await launched_instance.process_request()
 
     @classmethod
     @abstractmethod
