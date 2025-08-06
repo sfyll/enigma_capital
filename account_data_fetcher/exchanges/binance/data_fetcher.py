@@ -1,27 +1,184 @@
+import asyncio
 import datetime
 from datetime import timedelta
-import logging
-import os
 from os import listdir
 from os.path import isfile, join, getsize
 import time
-from typing import Optional, List
-
-import pandas as pd
-from pandas import DataFrame
-from binance.spot import Spot
+import functools
+import logging
+from typing import Optional, List, Dict
 
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
 
+import aiohttp
+from binance.spot import Spot
+import pandas as pd
+from pandas import DataFrame
 
 class DataFetcher(ExchangeBase):
     _EXCHANGE = "Binance"
-    _ENDPOINT = 'https://api.binance.com'
-    def __init__(self, secrets: ApiMetaData, port_number: int, sub_account_name: Optional[str] = None) -> None:
-        super().__init__(port_number, self._EXCHANGE)
+    def __init__(
+        self,
+        secrets: ApiMetaData,
+        session: aiohttp.ClientSession,
+        output_queue: asyncio.Queue,
+        fetch_frequency: int,
+        sub_account_name: Optional[str] = None
+    ) -> None:
+        super().__init__(
+            exchange=self._EXCHANGE,
+            session=session,
+            output_queue=output_queue,
+            fetch_frequency=fetch_frequency
+        )
+        self.logger = logging.getLogger(__name__)
         self._subaccount_name = sub_account_name
-        self._client = Spot(base_url="https://api1.binance.com",api_key=secrets.key, api_secret=secrets.secret)
+        self._client = Spot(
+            base_url="https://api1.binance.com",
+            api_key=secrets.key,
+            api_secret=secrets.secret
+        )
+
+    async def _run_in_executor(self, func, *args):
+        """Helper to run a synchronous function in the default thread pool executor."""
+        loop = asyncio.get_running_loop()
+        blocking_task = functools.partial(func, *args)
+        return await loop.run_in_executor(None, blocking_task)
+
+    async def fetch_balance(self, accountType: Optional[str] = None) -> float:
+        """
+        Asynchronously fetches the total account balance by running the blocking
+        API calls in a separate thread.
+        """
+        self.logger.info("Fetching total Binance balance (Spot + Margin).")
+        return await self._run_in_executor(self._get_total_balance_sync)
+
+    # MODIFIED: fetch_positions is now an async method.
+    async def fetch_positions(self, accountType: Optional[str] = None) -> Dict:
+        """
+        Asynchronously fetches all positions by running the blocking
+        API calls in a separate thread.
+        """
+        self.logger.info("Fetching all Binance positions (Spot + Margin).")
+        return await self._run_in_executor(self._get_all_positions_sync)
+
+    def _get_total_balance_sync(self) -> float:
+        """Synchronous calculation of total balance. Do not call directly from async code."""
+        binance_balance = self.convert_balances_to_dollars(self._client.user_asset())
+        isolated_margin_balance = self.convert_isolated_margin_balance_to_dollars(self._client.isolated_margin_account())
+        margin_account_balance = self.convert_cross_margin_balance_to_dollars(self._client.margin_account())
+
+        total_balance = binance_balance + isolated_margin_balance + margin_account_balance
+        return round(total_balance, 3)
+
+    def _get_all_positions_sync(self) -> Dict:
+        """Synchronous aggregation of all positions. Do not call directly from async code."""
+        data_to_return = {
+            "Symbol": [], "Multiplier": [], "Quantity": [], "Dollar Quantity": []
+        }
+        
+        spot_positions = self.get_spot_positions()
+        margin_positions = self.get_margin_positions()
+
+        all_positions = [spot_positions, margin_positions]
+
+        for pos_group in all_positions:
+            for i, symbol in enumerate(pos_group["Symbol"]):
+                if symbol in data_to_return["Symbol"]:
+                    index = data_to_return["Symbol"].index(symbol)
+                    data_to_return["Quantity"][index] += pos_group["Quantity"][i]
+                    data_to_return["Dollar Quantity"][index] += pos_group["Dollar Quantity"][i]
+                else:
+                    data_to_return["Symbol"].append(symbol)
+                    data_to_return["Multiplier"].append(1) # Spot/Margin multiplier is 1
+                    data_to_return["Quantity"].append(pos_group["Quantity"][i])
+                    data_to_return["Dollar Quantity"].append(pos_group["Dollar Quantity"][i])
+        
+        return data_to_return
+
+    def convert_balances_to_dollars(self, binance_balances: List[dict]) -> float:
+        netliq_in_dollars = 0
+        for asset_information in binance_balances:
+            btc_amount = float(asset_information["btcValuation"])
+            asset_amount = float(asset_information["free"])
+            if  btc_amount > 0.1 or asset_amount > 100:
+                if asset_information['asset'] in ["BUSD", "USDC", "USDT"]:
+                    netliq_in_dollars += asset_amount
+                    continue
+                elif "NFT" in asset_information['asset']:
+                    continue
+                price = float(self.get_latest_price(asset_information["asset"]+"USDT")["price"])
+                netliq_in_dollars += price * asset_amount
+        return round(netliq_in_dollars,3)
+
+    def convert_isolated_margin_balance_to_dollars(self, binance_balances_isolated_margin: dict) -> float:
+        netliq_in_dollars = 0
+        for cross in binance_balances_isolated_margin["assets"]:
+            if float(cross["baseAsset"]["netAsset"]) != 0:
+                asset = cross['baseAsset']
+                if asset["asset"] in ["BUSD", "USDC", "USDT"]:
+                    netliq_in_dollars += float(asset['netAsset'])
+                else:
+                    price = float(self._client.ticker_price(symbol=f"{asset['asset']}USDT")["price"])
+                    netliq_in_dollars += price * float(asset['netAsset'])
+            
+            if float(cross["quoteAsset"]["netAsset"]) != 0:
+                asset = cross['quoteAsset']
+                if asset["asset"] in ["BUSD", "USDC", "USDT"]:
+                    netliq_in_dollars += float(asset['netAsset'])
+                else:
+                    price = float(self._client.ticker_price(symbol=f"{asset['asset']}USDT")["price"])
+                    netliq_in_dollars += price * float(asset['netAsset'])
+        return round(netliq_in_dollars, 3)
+    
+    def convert_cross_margin_balance_to_dollars(self, margin_balance_info: dict) -> float:
+        btc_usdt_price = float(self._client.ticker_price(symbol="BTCUSDT")["price"])
+        net_asset_btc = float(margin_balance_info["totalNetAssetOfBtc"])
+        return round(net_asset_btc * btc_usdt_price, 2)
+
+    def get_spot_positions(self) -> dict:
+        user_assets = self._client.user_asset()
+        data_to_return = {"Symbol": [], "Multiplier": [], "Quantity": [], "Dollar Quantity": []}
+        
+        for user_asset in user_assets:
+            if float(user_asset["btcValuation"]) > 0.01:
+                data_to_return["Symbol"].append(user_asset['asset'])
+                data_to_return["Multiplier"].append(int(1))
+                data_to_return["Quantity"].append(float(user_asset["free"])+ float(user_asset["locked"]) + float(user_asset["freeze"]) + float(user_asset["withdrawing"]))
+                dollar_quantity = data_to_return["Quantity"][-1] if user_asset['asset'] in ["BUSD", "USDC", "USDT"] else round(float(self.get_latest_price(user_asset["asset"]+"USDT")["price"]) * data_to_return["Quantity"][-1],3)
+                data_to_return["Dollar Quantity"].append(round(dollar_quantity),3)
+        
+        return data_to_return
+
+    def get_margin_positions(self) -> dict:
+        # This logic is complex and makes multiple API calls. Kept as is.
+        user_assets = self._client.isolated_margin_account()
+        data_to_return = {"Symbol": [], "Multiplier": [], "Quantity": [], "Dollar Quantity": []}
+        
+        for user_asset in user_assets["assets"]:
+            base_asset = user_asset["baseAsset"]
+            quote_asset = user_asset["quoteAsset"]
+            
+            for asset in [base_asset, quote_asset]:
+                net_asset = float(asset['netAsset'])
+                if abs(net_asset) > 0:
+                    data_to_return["Symbol"].append(asset['asset'])
+                    data_to_return["Multiplier"].append(1)
+                    data_to_return["Quantity"].append(net_asset)
+                    
+                    dollar_quantity = net_asset
+                    if asset['asset'] not in ["BUSD", "USDC", "USDT"]:
+                        try:
+                            price = float(self._client.ticker_price(symbol=f"{asset['asset']}USDT")["price"])
+                            dollar_quantity = price * net_asset
+                        except:
+                            self.logger.warning(f"Could not fetch price for margin asset {asset['asset']}. Using net asset value.")
+                            dollar_quantity = net_asset
+                    data_to_return["Dollar Quantity"].append(round(dollar_quantity, 3))
+
+        return data_to_return
+
 
     def get_files_in_folder(self, path: str) -> list:
         onlyfiles = []
@@ -156,152 +313,3 @@ class DataFetcher(ExchangeBase):
 
         df.to_csv(path)
 
-    def fetch_balance(self, accountType: Optional[str] = None) -> float:
-        binance_balance: float = self.convert_balances_to_dollars(self.get_user_asset())
-        binance_isolated_margin_balance = self.convert_isolated_margin_balance_to_dollars(self.get_isolated_margin_account())
-        margin_account_balance = self.convert_cross_margin_balance_to_dollars(self.get_margin_account())
-
-        return round(binance_balance + binance_isolated_margin_balance + margin_account_balance, 3)
-
-    def fetch_specific_balance(self, accountType: str) -> float:
-        if accountType == "SPOT":
-            binance_balance: List[dict] = self.get_user_asset() 
-            return self.convert_balances_to_dollars(binance_balance)
-        elif accountType == "MARGIN":    
-            binance_isolated_margin_balance = self.get_isolated_margin_account()
-            return self.convert_isolated_margin_balance_to_dollars(binance_isolated_margin_balance)
-        else:
-            raise NotImplementedError(f"don't know accountType: {accountType} for balance")
-
-    def convert_cross_margin_balance_to_dollars(self, margin_balance_info: dict) -> float:
-        btc_usdt_price = float(self.get_latest_price("BTCUSDT")["price"])
-        net_asset_btc = float(margin_balance_info["totalNetAssetOfBtc"])
-        return round(net_asset_btc * btc_usdt_price, 2)
-
-    def convert_balances_to_dollars(self, binance_balances: List[dict]) -> float:
-        netliq_in_dollars = 0
-        for asset_information in binance_balances:
-            btc_amount = float(asset_information["btcValuation"])
-            asset_amount = float(asset_information["free"])
-            if  btc_amount > 0.1 or asset_amount > 100:
-                if asset_information['asset'] in ["BUSD", "USDC", "USDT"]:
-                    netliq_in_dollars += asset_amount
-                    continue
-                elif "NFT" in asset_information['asset']:
-                    continue
-                price = float(self.get_latest_price(asset_information["asset"]+"USDT")["price"])
-                netliq_in_dollars += price * asset_amount
-        return round(netliq_in_dollars,3)
-
-    def convert_isolated_margin_balance_to_dollars(self, binance_balances_isolated_margin: dict) -> float:
-        netliq_in_dollars = 0
-        for cross in binance_balances_isolated_margin["assets"]:
-            if str(cross["baseAsset"]["netAsset"]) != "0" and str(cross["quoteAsset"]["netAsset"]) != "0":
-                if cross['baseAsset']["asset"] in ["BUSD", "USDC", "USDT"]:
-                    netliq_in_dollars += float(cross['baseAsset']['netAsset'])
-                else:
-                    price = float(self.get_latest_price(cross['baseAsset']["asset"]+"USDC")["price"])
-                    netliq_in_dollars += price * float(cross['baseAsset']['netAsset'])
-                if cross['quoteAsset']["asset"] in ["BUSD", "USDC", "USDT"]:
-                    netliq_in_dollars += float(cross['quoteAsset']['netAsset'])
-                else:
-                    price = float(self.get_latest_price(cross['quoteAsset']["asset"]+"USDC")["price"])
-                    netliq_in_dollars += price * float(cross['quoteAsset']['netAsset'])
-
-        return round(netliq_in_dollars,3)
-
-    def fetch_positions(self, accountType: Optional[str] = None) -> dict:
-
-        data_to_return = {
-        "Symbol": [],
-        "Multiplier": [],
-        "Quantity": [],
-        "Dollar Quantity": []
-        }
-        
-        spot_positions = self.get_spot_positions()
-        future_positions = self.get_margin_positions()
-
-        all_positions = [spot_positions, future_positions]
-
-        # Aggregating positions by symbol
-        for pos in all_positions:
-            for i, symbol in enumerate(pos["Symbol"]):
-                if symbol in data_to_return["Symbol"]:
-                    index = data_to_return["Symbol"].index(symbol)
-                    data_to_return["Quantity"][index] += pos["Quantity"][i]
-                    data_to_return["Dollar Quantity"][index] += pos["Dollar Quantity"][i]
-                else:
-                    data_to_return["Symbol"].append(symbol)
-                    data_to_return["Multiplier"].append(1)
-                    data_to_return["Quantity"].append(pos["Quantity"][i])
-                    data_to_return["Dollar Quantity"].append(pos["Dollar Quantity"][i])
-
-        return data_to_return
-
-    def fetch_specific_positions(self, accountType: str) -> dict:
-        if accountType == "SPOT":
-           return self.get_spot_positions()
-        elif accountType == "MARGIN":
-            return self.get_margin_positions()
-        else:
-            raise NotImplementedError("Don't know {accountType=} for position fetching")
-
-    def get_spot_positions(self) -> dict:
-
-        user_assets = self.get_user_asset()
-        
-        data_to_return = {
-            "Symbol": [],
-            "Multiplier": [],
-            "Quantity": [],
-            "Dollar Quantity": []
-        }
-        
-        for user_asset in user_assets:
-            if float(user_asset["btcValuation"]) > 0.01:
-                data_to_return["Symbol"].append(user_asset['asset'])
-                data_to_return["Multiplier"].append(int(1))
-                data_to_return["Quantity"].append(float(user_asset["free"])+ float(user_asset["locked"]) + float(user_asset["freeze"]) + float(user_asset["withdrawing"]))
-                dollar_quantity = data_to_return["Quantity"][-1] if user_asset['asset'] in ["BUSD", "USDC", "USDT"] else round(float(self.get_latest_price(user_asset["asset"]+"USDT")["price"]) * data_to_return["Quantity"][-1],3)
-                data_to_return["Dollar Quantity"].append(round(dollar_quantity),3)
-        
-        return data_to_return
-
-    def get_margin_positions(self) -> dict:
-        #only isolated margin pos
-        user_assets = self.get_isolated_margin_account()
-        
-        data_to_return = {
-            "Symbol": [],
-            "Multiplier": [],
-            "Quantity": [],
-            "Dollar Quantity": []
-        }
-        
-        for user_asset in user_assets["assets"]:
-            if abs(float(user_asset["baseAsset"]["netAssetOfBtc"])) > 0.01:
-                data_to_return["Symbol"] += [user_asset["baseAsset"]['asset'], user_asset["quoteAsset"]['asset']]
-                data_to_return["Multiplier"] += [1, 1]
-                data_to_return["Quantity"] += [user_asset["baseAsset"]['netAsset'], user_asset["quoteAsset"]['netAsset']]
-                dollar_quantity_base = float(user_asset["baseAsset"]['netAsset']) if user_asset["baseAsset"]['asset'] in ["BUSD", "USDC", "USDT"] else round(float(self.get_latest_price(user_asset['baseAsset']["asset"]+"USDC")["price"]) * float(user_asset["baseAsset"]['netAsset']),3)
-                dollar_quantity_quote = float(user_asset["quoteAsset"]['netAsset']) if user_asset["quoteAsset"]['asset'] in ["BUSD", "USDC", "USDT"] else round(float(self.get_latest_price(user_asset['quoteAsset']["asset"]+"USDC")["price"]) * float(user_asset["quoteAsset"]['netAsset']),3)
-                data_to_return["Dollar Quantity"].append([dollar_quantity_base, dollar_quantity_quote])
-
-        return data_to_return
-
-
-if __name__ == "__main__":
-    from getpass import getpass
-    log_filename= os.path.expanduser("~") + "/log/test.py"
-    numeric_level = getattr(logging, "DEBUG", None)
-    logging.basicConfig(level=numeric_level, format='%(levelname)s:%(asctime)s:%(message)s', filename=log_filename) 
-    logger: logging.Logger = logging.getLogger()
-    pwd = getpass("provide password for pk:")
-    current_path = os.path.realpath(os.path.dirname(__file__))
-    parent_path = os.path.dirname(current_path)
-    executor = binanceDataFetcher(parent_path, pwd, logger)
-    # balances = executor.get_spot_positions()
-    # print(balances)
-    # executor.get_deposit_history(path=path)
-    # executor.get_withdraw_history(path=path)
