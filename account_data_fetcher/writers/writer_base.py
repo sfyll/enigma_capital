@@ -5,13 +5,10 @@ import logging.config
 import os
 from typing import Dict
 
-from setproctitle import setproctitle
-
 class WriterBase(ABC):
     """
     Abstract base class for writing data.
     """
-    __PROCESS_PREFIX = "writer_"
     def __init__(self, writer: str, input_queue: asyncio.Queue) -> None:
         """
         Initializes the WriterBase instance.
@@ -20,7 +17,6 @@ class WriterBase(ABC):
             writer (str): The name of the writer implementation (e.g., "CSV", "GSHEET").
             input_queue (asyncio.Queue): The queue from which to receive aggregated data.
         """
-        setproctitle(self.__PROCESS_PREFIX + writer.lower())
         self.writer = writer
         self.input_queue = input_queue
         self.logger = self.init_logging()

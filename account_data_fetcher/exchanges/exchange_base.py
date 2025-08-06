@@ -3,7 +3,6 @@ import asyncio
 import logging
 from typing import Optional
 
-from setproctitle import setproctitle
 import aiohttp 
 
 #TODO: For now, we only enforce two methods implementation, namely fetch_balance and fetch_positions. As such, process_request is quite statically defined as well. How could we untangle both so that we can define more abstract methods and have the process_request understands what to fetch dynamically.
@@ -13,8 +12,6 @@ class ExchangeBase(ABC):
     It fetches data from an exchange API and puts the resulting dictionary
     onto an asyncio.Queue for downstream processing.
     """
-    __PROCESS_PREFIX = "fetch_"
-
     def __init__(self, exchange: str, session: aiohttp.ClientSession, output_queue: asyncio.Queue, fetch_frequency: int = 60*60) -> None:
         """    
         Initializes the ExchangeBase object.
@@ -25,7 +22,6 @@ class ExchangeBase(ABC):
             output_queue (asyncio.Queue): The queue to send fetched data to.
             fetch_frequency (int, optional): Time interval for data fetching, in seconds.
         """
-        setproctitle(self.__PROCESS_PREFIX + exchange.lower())
         self.exchange: str = exchange.lower()
         self.session = session
         self.output_queue = output_queue
@@ -52,7 +48,7 @@ class ExchangeBase(ABC):
             while True:
                 balance_data = await self.fetch_balance()
                 positions_data = await self.fetch_positions()
-
+        
                 msg: dict = {
                     "exchange": self.exchange,
                     "balance": balance_data,
