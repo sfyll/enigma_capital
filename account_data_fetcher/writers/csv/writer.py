@@ -40,24 +40,27 @@ class Writer(WriterBase):
                         for col in set_new_columns - set_existing_columns:
                             df[col] = float(0)
                         
-                        new_row = pd.DataFrame([balances_data]).set_index("date")
+                        sanitized_balances = {k: v or 0.0 for k, v in balances_data.items()}
+                        new_row = pd.DataFrame([sanitized_balances]).set_index("date")
+                        
                         df = pd.concat([df, new_row])
                         df.to_csv(balance_path)
                         
                     elif set_new_columns.issubset(set_existing_columns):
-                        # The variable name here is now local to the function and doesn't cause a conflict
-                        balances_to_write = {col: balances_data.get(col, float(0)) for col in existing_columns}
+                        balances_to_write = {col: balances_data.get(col) or 0.0 for col in existing_columns}
                         with open(balance_path, 'a', newline='') as csvfile:
                             writer = DictWriter(csvfile, fieldnames=existing_columns)
                             writer.writerow(balances_to_write)
 
                 else:
+                    balances_to_write = {key: value or 0.0 for key, value in balances_data.items()}
                     with open(balance_path, 'a', newline='') as csvfile:
-                        writer = DictWriter(csvfile, fieldnames=balances_data.keys())
-                        writer.writerow(balances_data)
+                        writer = DictWriter(csvfile, fieldnames=existing_columns)
+                        writer.writerow(balances_to_write)
                         
             except (pd.errors.EmptyDataError, FileNotFoundError):
-                pd.DataFrame([balances_data]).set_index("date").to_csv(balance_path)
+                balances_to_write = {key: value or 0.0 for key, value in balances_data.items()}
+                pd.DataFrame([balances_to_write]).set_index("date").to_csv(balance_path)
 
         async with self._balance_lock:
             await asyncio.to_thread(blocking_io_handler, balances)
