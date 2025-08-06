@@ -98,11 +98,12 @@ class Runner(RunnerBase):
             
             init_params = inspect.signature(FetcherClass).parameters
             secret_keys = "ib" if "ib" in name else name
+            exchange_name = "ib" if name in ["ib_async", "ib_flex"] else name
             possible_args = {
                 "fetch_frequency": frequency,
                 "secrets": self.secrets_per_process.get(secret_keys),
                 "session": session, 
-                "exchange": name,
+                "exchange": exchange_name,
                 "output_queue": queues[name]  # Pass the queue instead of a port
             }
 
