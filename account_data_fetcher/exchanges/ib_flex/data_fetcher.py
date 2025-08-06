@@ -15,7 +15,7 @@ import requests
 from time import sleep
 
 class DataFetcher(ExchangeBase):
-    _EXCHANGE = "IB_FLEX"
+    _EXCHANGE = "IB"
     __HOURS_DIFFERENCE_FROM_UTC = -5
 
     def __init__(self, secrets: ApiMetaData, session: aiohttp.ClientSession, output_queue: asyncio.Queue, fetch_frequency: int) -> None:
