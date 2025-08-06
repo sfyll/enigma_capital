@@ -7,8 +7,6 @@ from typing import Dict, List, Optional, Set
 
 from setproctitle import setproctitle
 
-from infrastructure.log_handler import fetch_logging_config
-
 @dataclass
 class BalanceData:
     """
@@ -195,6 +193,9 @@ class AggregatedData:
 class DataAggregator:
     """Main class for aggregating data from multiple exchanges and publishing it to the writers.
 
+    This version uses a more robust and cleaner asyncio pattern by merging all
+    input queues into one, simplifying the main processing loop.
+
     Attributes:
         aggregated_data (AggregatedData): Data to be aggregated and sent.
     """
@@ -214,45 +215,64 @@ class DataAggregator:
         Returns:
             logging.Logger: Configured logger.
         """
-        fetch_logging_config('/account_data_fetcher/config/logging_config.ini')
         return logging.getLogger(__name__)
 
-    async def _queue_consumer(self, exchange_name: str, queue: asyncio.Queue):
-        """A wrapper coroutine to consume from a queue and yield the source."""
+    async def _forward_data(self, exchange_name: str, source_queue: asyncio.Queue, dest_queue: asyncio.Queue):
+        """
+        A long-running coroutine that forwards data from a source queue to a destination queue.
+        It wraps the data in a tuple with its exchange name.
+        """
         while True:
-            data = await queue.get()
-            yield exchange_name, data
+            try:
+                data = await source_queue.get()
+                await dest_queue.put((exchange_name, data))
+                source_queue.task_done()
+            except asyncio.CancelledError:
+                self.logger.info(f"Forwarder for {exchange_name} is shutting down.")
+                break
+            except Exception as e:
+                self.logger.error(f"Error in forwarder for {exchange_name}: {e}", exc_info=True)
+
 
     async def run(self):
         """
         Main method to aggregate data from input queues and publish to output queues.
         """
-        consumers = [self._queue_consumer(name, queue) for name, queue in self.input_queues.items()]
+        merged_queue = asyncio.Queue()
+        forwarder_tasks = []
+
+        for name, queue in self.input_queues.items():
+            task = asyncio.create_task(self._forward_data(name, queue, merged_queue))
+            forwarder_tasks.append(task)
         
+        self.logger.info(f"Started {len(forwarder_tasks)} queue forwarders.")
+
         try:
             while True:
-                tasks: List[asyncio.Task] = [asyncio.create_task(consumer.__anext__()) for consumer in consumers]
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                exchange_name, data = await merged_queue.get()
                 
-                for task in done:
-                    exchange_name, data = task.result()
-                    self.logger.debug(f"Received from {exchange_name=}, {data=}")
+                self.logger.debug(f"Received from {exchange_name=}, {data=}")
 
-                    if exchange_name not in self.aggregated_data.exchanges:
-                        empty_positions = {k: [] for k in ["Symbol", "Multiplier", "Quantity", "Dollar Quantity"]}
-                        self.aggregated_data.exchanges[exchange_name] = ExchangeData(position=PositionData(data=empty_positions))
-                    
-                    self.aggregated_data.exchanges[exchange_name].update(data)
-                    
-                    objects_to_send = self.aggregated_data.get_object_if_ready()
-                    if objects_to_send:
-                        self.logger.debug(f"Aggregated object ready. Pushing to {len(self.output_queues)} writers.")
-                        await asyncio.gather(*(q.put(objects_to_send) for q in self.output_queues.values()))
+                if exchange_name not in self.aggregated_data.exchanges:
+                    empty_positions = {k: [] for k in ["Symbol", "Multiplier", "Quantity", "Dollar Quantity"]}
+                    self.aggregated_data.exchanges[exchange_name] = ExchangeData(position=PositionData(data=empty_positions))
                 
-                # Re-add pending tasks for the next iteration
-                tasks = [asyncio.create_task(consumer.__anext__()) for consumer in consumers if consumer.__anext__() in pending]
+                self.aggregated_data.exchanges[exchange_name].update(data)
+                
+                objects_to_send = self.aggregated_data.get_object_if_ready()
+                if objects_to_send:
+                    self.logger.info(f"Aggregated object ready. Pushing to {len(self.output_queues)} writers.")
+                    await asyncio.gather(*(q.put(objects_to_send) for q in self.output_queues.values()))
+                
+                merged_queue.task_done()
 
         except asyncio.CancelledError:
             self.logger.info("Data aggregator is shutting down.")
         except Exception as e:
             self.logger.error(f"DataAggregator failed: {e}", exc_info=True)
+        finally:
+            self.logger.info("Cancelling forwarder tasks...")
+            for task in forwarder_tasks:
+                task.cancel()
+            await asyncio.gather(*forwarder_tasks, return_exceptions=True)
+            self.logger.info("All forwarder tasks have been cancelled.")
