@@ -1,63 +1,60 @@
-from datetime import  datetime, timedelta
+import asyncio
 import logging
-import os
-from requests.exceptions import ReadTimeout
-from time import sleep
-from typing import Optional
-
-from ibflex import parser as ibparser
-from ibflex import client
-from ibflex.Types import OpenPosition, FlexQueryResponse, FlexStatement
-from ibflex.client import ResponseCodeError, request_statement, check_statement_response
+import functools
 
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
 
+import aiohttp
+from ibflex import parser as ibparser, client
+from ibflex.Types import OpenPosition, FlexQueryResponse
+from ibflex.client import ResponseCodeError, request_statement, check_statement_response
 import requests
+from time import sleep
 
 class DataFetcher(ExchangeBase):
-    __HOURS_DIFFERENCE_FROM_UTC = -5
-    __EXCHANGE= "IB"
+    # MODIFIED: Renamed to _EXCHANGE for consistency with the guide's examples.
+    _EXCHANGE = "IB_FLEX" 
 
-    def __init__(self, secrets: ApiMetaData, port_number: int) -> None:
-        super().__init__(port_number, self.__EXCHANGE)
+    def __init__(self, secrets: ApiMetaData, session: aiohttp.ClientSession, output_queue: asyncio.Queue, fetch_frequency: int) -> None:
+        super().__init__(
+            exchange=self._EXCHANGE,
+            session=session,
+            output_queue=output_queue,
+            fetch_frequency=fetch_frequency
+        )
         self.__get_account_and_query_ids(secrets)
         self.logger = logging.getLogger(__name__)
-        self.balance_object: Optional[FlexStatement] = None
-        self.positions_object: Optional[FlexStatement] = None
 
     def __get_account_and_query_ids(self, secrets: ApiMetaData) -> None:
+        """Extracts token and query IDs from secrets."""
         self.account_and_query_ids: dict = {
-            "token" : secrets.other_fields["Token"],
-            "query_id_balance" : secrets.other_fields["Balance_query_id"],
-            "query_id_position" : secrets.other_fields["Position_query_id"]
+            "token": secrets.other_fields["Token"],
+            "query_id_balance": secrets.other_fields["Balance_query_id"],
+            "query_id_position": secrets.other_fields["Position_query_id"]
         }
 
-    def update_balance_and_get_ib_datetime(self) -> datetime:
-        if not self.is_acceptable_timestamp_detla(self.balance_object, "BALANCE"):
-            self.get_balance_object()
-        return self.balance_object.whenGenerated
-
-    def update_positions_and_get_ib_datetime(self) -> datetime:
-        if not self.is_acceptable_timestamp_detla(self.positions_object, "POSITIONS"):
-            self.get_positions_object()
-        return self.positions_object.whenGenerated
-
-    def fetch_balance(self, accountType = None) -> float:
-        if not self.is_acceptable_timestamp_detla(self.balance_object, "BALANCE"):
-            self.get_balance_object()
+    async def fetch_balance(self, accountType=None) -> float:
+        """
+        Fetches the total account balance.
+        """
+        self.logger.debug("Fetching balance report from IB Flex.")
+        response = await self._fetch_report_async(self.account_and_query_ids["query_id_balance"])
+        statement = response.FlexStatements[0]
         
-        self.logger.debug(
-            f"{self.balance_object=}"
-        )
-        return round(float(self.balance_object.ChangeInNAV.endingValue),3)
+        self.logger.debug(f"Balance statement received: {statement}")
+        return round(float(statement.ChangeInNAV.endingValue), 3)
 
-    def fetch_positions(self, accountType = None) -> dict:
-        if not self.is_acceptable_timestamp_detla(self.positions_object, "POSITIONS"):
-            self.get_positions_object()
-        #denominate in usd so multiply by FXRateToBase, get columns: Symbol, Multiplier, Quantity, MarkPrice, CostBasisPrice, FifoPnlUnrealized
-        stmt: OpenPosition = self.positions_object.OpenPositions
-        self.logger.debug(stmt)
+    async def fetch_positions(self, accountType=None) -> dict:
+        """
+        Fetches current open positions.
+        """
+        self.logger.debug("Fetching positions report from IB Flex.")
+        response = await self._fetch_report_async(self.account_and_query_ids["query_id_position"])
+        statement = response.FlexStatements[0]
+        
+        open_positions: OpenPosition = statement.OpenPositions
+        self.logger.debug(f"Positions statement received: {open_positions}")
 
         data_to_return = {
             "Symbol": [],
@@ -66,115 +63,84 @@ class DataFetcher(ExchangeBase):
             "Dollar Quantity": []
         }
 
-        for position in stmt:
+        for position in open_positions:
             data_to_return["Symbol"].append(position.symbol)
             data_to_return["Multiplier"].append(int(position.multiplier))
             data_to_return["Quantity"].append(int(position.position))
-            data_to_return["Dollar Quantity"].append(round(float(position.markPrice) * float(position.multiplier) * int(position.position),3))
+            dollar_quantity = round(float(position.markPrice) * float(position.multiplier) * int(position.position), 3)
+            data_to_return["Dollar Quantity"].append(dollar_quantity)
         
         return data_to_return
 
-    def get_balance_object(self) -> None:
-        data = self.get_and_parse_data(self.account_and_query_ids["token"], self.account_and_query_ids["query_id_balance"])
-        self.balance_object = data.FlexStatements[0]
-        self.logger.debug(self.balance_object)
+    async def _fetch_report_async(self, query_id: str) -> FlexQueryResponse:
+        """
+        Asynchronously requests a report by running the blocking `ibflex`
+        and `requests` calls in a separate thread to avoid blocking the asyncio event loop.
+        """
+        loop = asyncio.get_running_loop()
+        token = self.account_and_query_ids["token"]
+        
+        func = functools.partial(self._fetch_and_parse_report_sync, token, query_id)
+        
+        response = await loop.run_in_executor(None, func)
+        return response
 
-    def get_positions_object(self) -> None:
-        data = self.get_and_parse_data(self.account_and_query_ids["token"], self.account_and_query_ids["query_id_position"])
-        self.positions_object = data.FlexStatements[0]
-        self.logger.debug(self.positions_object)
-
-    def is_acceptable_timestamp_detla(self, object_to_check: Optional[FlexStatement], query_type: str = "BALANCE") -> bool:
-        if not object_to_check:
-            return False
-
-        dt = datetime.utcnow()
-
-        if query_type == "BALANCE":
-            delta: timedelta = (dt + timedelta(hours=self.__HOURS_DIFFERENCE_FROM_UTC)) - object_to_check.whenGenerated 
-            return delta.total_seconds() < 120
-        if query_type == "POSITIONS":
-            delta: timedelta = (dt + timedelta(hours=self.__HOURS_DIFFERENCE_FROM_UTC)) - object_to_check.whenGenerated 
-            return delta.total_seconds() < 120
-    
-    def get_and_parse_data(self, token, query_id):
-        data = self.get_data(token, query_id)
-        return self.parse_data(data)
-
-    def get_data(self, token, query_id):
-        max_retries = 10 
+    def _fetch_and_parse_report_sync(self, token: str, query_id: str) -> FlexQueryResponse:
+        """
+        This synchronous method contains the original blocking logic for fetching and parsing
+        a report from IB Flex. It is designed to be run in a thread pool.
+        
+        It combines the logic from the old `get_data`, `_request_statement_and_poll`, and `get_and_parse_data` methods.
+        """
+        max_retries = 5 
         for attempt in range(1, max_retries + 1):
             try:
-                return self._request_statement_and_poll(token, query_id)
+                # 1. Ask IB to start generating the statement
+                self.logger.debug(f"Requesting statement for query '{query_id}' (Attempt: {attempt})")
+                stmt_access = request_statement(token, query_id, url=client.REQUEST_URL)
+                # 2. Poll until the statement is ready
+                poll_attempts = 0
+                while True:
+                    poll_attempts += 1
+                    url = stmt_access.Url or client.STMT_URL
+                    params = {"v": "3", "t": token, "q": stmt_access.ReferenceCode}
+                    headers = {"user-agent": "Java"}
+
+                    try:
+                        # Use a dynamic timeout that increases with each poll attempt
+                        resp = requests.get(url, params=params, headers=headers, timeout=(30 * poll_attempts))
+                        resp.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+
+                        # Check if the statement is ready
+                        result = check_statement_response(resp)
+                        if result is True:
+                            self.logger.debug(f"Successfully received report for query '{query_id}'.")
+                            return ibparser.parse(resp.content)
+                        else:
+                            wait_seconds = result
+                            self.logger.debug(f"Statement not ready; waiting {wait_seconds}s (Poll attempt {poll_attempts}).")
+                            sleep(wait_seconds)
+                    
+                    except requests.exceptions.Timeout:
+                        if poll_attempts >= 6:
+                            self.logger.error("Polling for report timed out after multiple attempts.")
+                            raise
+                        self.logger.warning(f"Timeout on poll attempt {poll_attempts}, re-trying in 10s.")
+                        sleep(10)
+                        continue
+            
             except ResponseCodeError as e:
-                # e.g. code 1018 means 'Statement generation in progress', we can sleep:
+                # e.g. code 1018 means 'Statement generation in progress', we should wait and retry.
                 if int(e.code) == 1018:
-                    self.logger.debug(f"Got 1018 on attempt {attempt}. Sleeping before retry.")
-                    sleep(5 * attempt)
+                    self.logger.debug(f"IBflex code 1018 received (generation in progress). Retrying after a delay.")
+                    sleep(5 * attempt)  # Backoff delay
                     continue
                 else:
-                    raise Exception(f"Unusual error {e}")
-            except ReadTimeout as e:
-                self.logger.debug(f"ReadTimeout on attempt {attempt}, sleeping 15s: {e}")
+                    self.logger.error(f"An unexpected IBflex response code error occurred: {e}")
+                    raise
+            except requests.exceptions.RequestException as e:
+                self.logger.warning(f"A network error occurred on attempt {attempt}: {e}. Retrying after 15s.")
                 sleep(15)
                 continue
-        raise Exception("Kept on getting errors beyond max_retries") 
-
-    def _request_statement_and_poll(self, token: str, query_id: str) -> bytes:
-        """
-        Implements the ibflex 2-step approach manually:
-          1) request_statement => get reference code & URL
-          2) poll until statement is ready
-        but with your own timeouts/retries to handle large statements.
-        """
-        # 1) Ask IB to start generating the statement
-        stmt_access = request_statement(token, query_id, url=client.REQUEST_URL)
-
-        # 2) Repeatedly request the statement data at the 'Url' with the reference code
-        poll_attempts = 0
-        while True:
-            poll_attempts += 1
-            # Build your GET:
-            url = stmt_access.Url or client.STMT_URL
-            params = {"v": "3", "t": token, "q": stmt_access.ReferenceCode}
-            headers = {"user-agent": "Java"}
-
-            # Example: extend the timeout drastically for large statements
-            try:
-                # e.g. 30s * poll_attempts for a bit of dynamic backoff
-                resp = requests.get(url, params=params, headers=headers, timeout=(30 * poll_attempts))
-            except requests.exceptions.Timeout:
-                # You can either break or raise, or keep trying
-                if poll_attempts >= 6:
-                    raise
-                self.logger.warning(f"Timeout on poll attempt {poll_attempts}, re-trying in 10s.")
-                sleep(10)
-                continue
-
-            # 3) Check the response
-            result = check_statement_response(resp)
-            if result is True:
-                # means `resp.content` is the real flex data
-                return resp.content
-            else:
-                # means IB told us "not ready yet" or "throttled" -> result is how many seconds to wait
-                wait_seconds = result
-                self.logger.debug(f"Statement not ready; waiting {wait_seconds}s (attempt {poll_attempts}).")
-                # If you want to increase or cap wait_seconds, do so here
-                sleep(wait_seconds)
-
-    def parse_data(self, data) -> FlexQueryResponse:
-        return ibparser.parse(data)
-
-if __name__ == '__main__':
-    from getpass import getpass
-    log_filename= os.path.expanduser("~") + "/log/test.py"
-    numeric_level = getattr(logging, "DEBUG", None)
-    logging.basicConfig(level=numeric_level, format='%(levelname)s:%(asctime)s:%(message)s', filename=log_filename) 
-    logger: logging.Logger = logging.getLogger()
-    pwd = getpass("provide password for pk:")
-    current_path = os.path.realpath(os.path.dirname(__file__))
-    executor = DataFetcher(current_path, pwd)
-    balances = executor.fetch_balance()
-    print(balances)
-
+        
+        raise Exception(f"Failed to fetch report for query '{query_id}' after {max_retries} attempts.")
