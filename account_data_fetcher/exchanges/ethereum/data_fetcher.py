@@ -1,10 +1,13 @@
+import asyncio
 import dataclasses
-from datetime import datetime, timedelta
+import functools
 import json
 import logging
 import os
-from typing import Callable, Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 
+import aiohttp
 from web3 import Web3
 
 from account_data_fetcher.config.onchain_config import *
@@ -17,45 +20,41 @@ class balanceMetaData:
     timestamp: datetime
     balance_per_coin: Dict[str, float]
 
-    def is_acceptable_timestamp_detla(self, delta_in_seconds_allowed) -> bool:
-
-            dt = datetime.utcnow()
-
-            delta: timedelta = dt - self.timestamp
-
-            return delta.total_seconds() < delta_in_seconds_allowed
-
+    def is_acceptable_timestamp_delta(self, delta_in_seconds_allowed) -> bool:
+        delta: timedelta = datetime.utcnow() - self.timestamp
+        return delta.total_seconds() < delta_in_seconds_allowed
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class priceMetaData:
     timestamp: datetime
     prices_per_coin: Dict[str, Dict[str, float]]
 
-    def is_acceptable_timestamp_detla(self, delta_in_seconds_allowed) -> bool:
+    def is_acceptable_timestamp_delta(self, delta_in_seconds_allowed) -> bool:
+        delta: timedelta = datetime.utcnow() - self.timestamp
+        return delta.total_seconds() < delta_in_seconds_allowed
 
-            dt = datetime.utcnow()
-
-            delta: timedelta = dt - self.timestamp 
-                
-            return delta.total_seconds() < delta_in_seconds_allowed
-
-#TODO: Batch calls via multicall contracts + use helios lightweight client (need to fix eth_call loops, broken atm)
 class DataFetcher(ExchangeBase):
     __URL = "https://eth-mainnet.g.alchemy.com/v2/"
     __EXCHANGE = "Ethereum"
 
-    def __init__(self, secrets: ApiMetaData, port_number: int, delta_in_seconds_allowed: int = 30) -> None:
-        super().__init__(port_number, self.__EXCHANGE)
-        self.logger = logging.getLogger(__name__) 
+    def __init__(self, secrets: ApiMetaData, session: aiohttp.ClientSession, output_queue: asyncio.Queue, fetch_frequency: int) -> None:
+        super().__init__(
+            exchange=self.__EXCHANGE,
+            session=session,
+            output_queue=output_queue,
+            fetch_frequency=fetch_frequency
+        )
+        self.logger = logging.getLogger(__name__)
         self.price_meta_data: Optional[priceMetaData] = None
         self.balance_meta_data: Optional[balanceMetaData] = None
+        
         self.__ADDRESS_BY_COIN, self.__DECIMAL_BY_COIN = self.__get_coin_configs()
-        self.w3 = Web3(Web3.HTTPProvider(self.__URL+secrets.key))
+        self.w3 = Web3(Web3.HTTPProvider(self.__URL + secrets.key))
         self.contract_by_coin: dict = self.__get_contract_by_coin()
         self.address_of_interest: list = self.__get_address_of_interest()
-        self.delta_in_seconds_allowed: int = delta_in_seconds_allowed
-        self.price_fetcher: CoingeckoDataFetcher = CoingeckoDataFetcher()
-    
+        
+        self.price_fetcher = CoingeckoDataFetcher(session)
+
     @staticmethod
     def __get_coin_configs():
         address_by_coin: dict = {}
@@ -91,123 +90,119 @@ class DataFetcher(ExchangeBase):
 
         with open(path, "r") as f:
             return json.load(f)['addresses_per_chain']['Ethereum']
-            
-    def __get_total_balance_by_coin(self, delta_in_seconds: int = 120) -> float:
-        if self.balance_meta_data:
-            if self.balance_meta_data.is_acceptable_timestamp_detla(delta_in_seconds):
-                return self.balance_meta_data.balance_per_coin
-
-        eth_balance_gwei: float = self.__get_eth_balances()
-
-        token_balances: dict[str, float] = self.__get_token_balances_by_coin()
-
-        token_balances["ETH"] = eth_balance_gwei
-
-        self.balance_meta_data = balanceMetaData(
-            timestamp=datetime.utcnow(),
-            balance_per_coin=token_balances
-        )
-
-        return token_balances
-
-    def __get_eth_balances(self) -> dict:
-        balance: float = 0
-        
-        for my_address in self.address_of_interest:
-            balance +=  self.w3.eth.get_balance(Web3.to_checksum_address(my_address)) / (10 ** self.__DECIMAL_BY_COIN["ETH"])
-
-        return balance
     
-    def __get_token_balances_by_coin(self) -> dict:
-        balance_by_coin: dict[str, float] = {}
+    async def _run_in_executor(self, func, *args, **kwargs):
+        """Helper to run a synchronous function in the default thread pool."""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
 
-        multi_call_result = self.__query_multi_call()
+    async def fetch_balance(self, accountType="SPOT") -> float:
+        """Asynchronously fetches the total USD value of all assets."""
+        balance_by_coin: dict = await self.__get_total_balance_by_coin_async()
+        if not balance_by_coin:
+            return 0.0
 
-        counter: int = 0
-        for coin, _ in self.__ADDRESS_BY_COIN.items():
-            for _ in self.address_of_interest:
-               balance = self.w3.to_int(multi_call_result[counter])
-               if coin in balance_by_coin and int(balance) > 0:
-                   balance_by_coin[coin] += balance / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
-               elif coin not in balance_by_coin and int(balance) > 0:
-                   balance_by_coin[coin] = balance / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
-               counter += 1
-
-        return balance_by_coin
-    
-    def __query_multi_call(self) -> List[bytes]:
-        calls: List[tuple] = []
-        
-        for coin, token_address in self.__ADDRESS_BY_COIN.items():
-            for address in self.address_of_interest:
-                balance_call_data = self.contract_by_coin[coin].encode_abi('balanceOf', args=[Web3.to_checksum_address(address)])  
-                calls.append((token_address, balance_call_data))
-                
-        multicall_contract = self.w3.eth.contract(address=MULTICALL_3_ADDRESS, abi=MULTICALL3_ABI)
-        return multicall_contract.functions.aggregate(tuple(calls)).call()[1]
-
-    def fetch_balance(self, accountType = "SPOT") -> float:
-        balance_by_coin: dict = self.__get_total_balance_by_coin()
-        self.logger.debug(f"{balance_by_coin=}")
+        await self.get_prices_for_coins_async(balance_by_coin)
         
         netliq: float = 0
-        
-        self.get_prices_for_coins(balance_by_coin)
-        
         for coin, balance in balance_by_coin.items():
-            if "USD" in coin:
+            if "USD" in coin.upper():
                 netliq += balance
-            else:
-                price = self.price_meta_data.prices_per_coin[coin]["usd"]
+            elif self.price_meta_data and coin in self.price_meta_data.prices_per_coin:
+                price = self.price_meta_data.prices_per_coin[coin].get("usd", 0)
                 netliq += float(balance) * float(price)
         
-        return round(netliq,3)
-    
-    def fetch_positions(self) -> dict:
-        balance_by_coin = self.__get_total_balance_by_coin()
+        return round(netliq, 3)
 
-        data_to_return = {
-            "Symbol": [],
-            "Multiplier": [],
-            "Quantity": [],
-            "Dollar Quantity": []
-        } 
+    async def fetch_positions(self) -> dict:
+        """Asynchronously fetches detailed positions of all assets."""
+        balance_by_coin = await self.__get_total_balance_by_coin_async()
 
+        data_to_return = {"Symbol": [], "Multiplier": [], "Quantity": [], "Dollar Quantity": []}
+        if not balance_by_coin:
+            return data_to_return
 
-        self.get_prices_for_coins(balance_by_coin) 
+        await self.get_prices_for_coins_async(balance_by_coin)
 
         for coin, balance in balance_by_coin.items():
-            if "USD" in coin:
-                data_to_return["Symbol"].append("USD")
-                data_to_return["Multiplier"].append(1)
-                data_to_return["Quantity"].append(round(balance, 3))
-                data_to_return["Dollar Quantity"].append(round(balance,3 ))
-            else:
-                price = self.price_meta_data.prices_per_coin[coin]["usd"]
-                data_to_return["Symbol"].append(coin)
-                data_to_return["Multiplier"].append(1)
-                data_to_return["Quantity"].append(round(balance, 3))
-                data_to_return["Dollar Quantity"].append(round(float(balance) * float(price),3))
+            dollar_quantity = 0
+            price = 0
+            if "USD" in coin.upper():
+                dollar_quantity = balance
+            elif self.price_meta_data and coin in self.price_meta_data.prices_per_coin:
+                price = self.price_meta_data.prices_per_coin[coin].get("usd", 0)
+                dollar_quantity = float(balance) * float(price)
+
+            data_to_return["Symbol"].append(coin)
+            data_to_return["Multiplier"].append(1)
+            data_to_return["Quantity"].append(round(balance, 3))
+            data_to_return["Dollar Quantity"].append(round(dollar_quantity, 3))
         
         return data_to_return
 
-    def get_prices_for_coins(self, balance_by_coin: Dict[str, float]) -> None:
-        if self.price_meta_data:
-            if self.price_meta_data.is_acceptable_timestamp_detla(self.delta_in_seconds_allowed):
-                return self.price_meta_data.prices_per_coin
+    async def get_prices_for_coins_async(self, balance_by_coin: Dict[str, float]) -> None:
+        """Asynchronously gets prices for coins, using cached data if fresh."""
+        if self.price_meta_data and self.price_meta_data.is_acceptable_timestamp_delta(self.fetch_frequency):
+            return
+
+        coins_to_fetch = [coin for coin, balance in balance_by_coin.items() if "USD" not in coin.upper() and balance > 0]
+
+        price_per_coin = await self.price_fetcher.get_prices(coins_to_fetch)
+        self.price_meta_data = priceMetaData(timestamp=datetime.utcnow(), prices_per_coin=price_per_coin)
+
+    async def __get_total_balance_by_coin_async(self) -> dict:
+        """Async wrapper for fetching balances, respects caching."""
+        if self.balance_meta_data and self.balance_meta_data.is_acceptable_timestamp_delta(self.fetch_frequency):
+            return self.balance_meta_data.balance_per_coin
         
-        #fetching all but stablecoins usd denominated
-        coins_to_fetch_price_for: List[str] = [coin for coin, _ in balance_by_coin.items() if "USD" not in coin]
+        balances = await self._run_in_executor(self.__get_total_balance_by_coin_sync)
+        if balances:
+            self.balance_meta_data = balanceMetaData(timestamp=datetime.utcnow(), balance_per_coin=balances)
+        return balances
 
-        price_per_coin = self.price_fetcher.get_prices(coins_to_fetch_price_for)
+    def __get_total_balance_by_coin_sync(self) -> dict:
+        """Original synchronous logic for fetching all balances."""
+        try:
+            eth_balance = self.__get_eth_balances_sync()
+            token_balances = self.__get_token_balances_by_coin_sync()
+            token_balances["ETH"] = eth_balance
+            return token_balances
+        except Exception as e:
+            self.logger.error(f"Failed to fetch on-chain balances: {e}", exc_info=True)
+            return {}
 
-        dt = datetime.utcnow()
-
-        self.price_meta_data = priceMetaData(
-            timestamp=dt,
-            prices_per_coin=price_per_coin
-        )
-
+    def __get_eth_balances_sync(self) -> float:
+        """Original synchronous logic for fetching native ETH balance."""
+        balance: float = 0
+        for my_address in self.address_of_interest:
+            balance += self.w3.eth.get_balance(Web3.to_checksum_address(my_address))
+        return balance / (10 ** self.__DECIMAL_BY_COIN["ETH"])
+    
+    def __get_token_balances_by_coin_sync(self) -> dict:
+        """Original synchronous logic for fetching ERC20 token balances using multicall."""
+        balance_by_coin: dict = {}
+        multi_call_result = self.__query_multi_call_sync()
+        counter = 0
+        for coin, _ in self.__ADDRESS_BY_COIN.items():
+            for _ in self.address_of_interest:
+                balance_wei = self.w3.to_int(multi_call_result[counter])
+                if balance_wei > 0:
+                    balance = balance_wei / (10 ** self.__DECIMAL_BY_COIN[coin.upper()])
+                    balance_by_coin[coin] = balance_by_coin.get(coin, 0) + balance
+                counter += 1
+        return balance_by_coin
+    
+    def __query_multi_call_sync(self) -> List[bytes]:
+        """Original synchronous multicall query logic."""
+        calls = []
+        for coin, token_address in self.__ADDRESS_BY_COIN.items():
+            for address in self.address_of_interest:
+                balance_call_data = self.contract_by_coin[coin].encode_abi('balanceOf', args=[Web3.to_checksum_address(address)])
+                calls.append((Web3.to_checksum_address(token_address), balance_call_data))
+        
+        multicall_contract = self.w3.eth.contract(address=Web3.to_checksum_address(MULTICALL_3_ADDRESS), abi=MULTICALL3_ABI)
+        return multicall_contract.functions.aggregate(tuple(calls)).call()[1]
+            
     #Below is to debug helios client
     def encode_token_balances_by_coin_calls(self):
         calls: List[str] = []
@@ -233,27 +228,3 @@ class DataFetcher(ExchangeBase):
                         balance_by_coin[coin.upper()] = int(result) / 10 ** self.__DECIMAL_BY_COIN[coin.upper()]
 
         return balance_by_coin
-
-
-if __name__ == '__main__':
-    from getpass import getpass
-    from account_data_fetcher.offchain.coingecko_data_fetcher import coingeckoDataFetcher
-    log_filename= os.path.expanduser("~") + "/log/test.py"
-    numeric_level = getattr(logging, "DEBUG", None)
-    logging.basicConfig(level=numeric_level, format='%(levelname)s:%(asctime)s:%(message)s', filename=log_filename) 
-    logger: logging.Logger = logging.getLogger()
-    pwd = getpass("provide password for pk:")
-    current_path = os.path.realpath(os.path.dirname(__file__))
-    price_fetcher = coingeckoDataFetcher().get_prices
-    executor = ethereumDataFetcher(current_path, pwd)
-    # print(executor.get_token_balances_by_coin())
-    # print(executor.get_token_balances_by_coin_single_calls())
-    # balance = executor.get_netliq(price_fetcher)
-    # print(f"{balance=}")
-    calls, addresses = executor.encode_token_balances_by_coin_calls()
-    print(f"{calls=}")
-    print(f"{addresses=}")
-    # print(len(calls))
-    # print(len(addresses))
-    # print(balances)
-
