@@ -5,8 +5,6 @@ import logging
 import time
 from typing import Dict, List, Optional, Set
 
-from setproctitle import setproctitle
-
 @dataclass
 class BalanceData:
     """
@@ -200,7 +198,11 @@ class DataAggregator:
         aggregated_data (AggregatedData): Data to be aggregated and sent.
     """
     def __init__(self, aggregation_interval: int, input_queues: Dict[str, asyncio.Queue], output_queues: Dict[str, asyncio.Queue]) -> None:
-        setproctitle("data_aggregator")
+        for old_key in ("ib_flex", "ib_async"):
+            if old_key in input_queues:
+                input_queues["ib"] = input_queues.pop(old_key)
+                break
+
         self.logger = self.init_logging()
         self.input_queues = input_queues
         self.output_queues = output_queues
