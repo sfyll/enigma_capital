@@ -1,16 +1,11 @@
 from abc import ABC, abstractmethod
 import asyncio
-import json
 import logging
 import logging.config
 import os
 from typing import Dict
 
 from setproctitle import setproctitle
-import zmq.asyncio as zmq_async
-import zmq
-
-from infrastructure.log_handler import fetch_logging_config
 
 class WriterBase(ABC):
     """
@@ -37,7 +32,6 @@ class WriterBase(ABC):
         Returns:
             logging.Logger: Logger object.
         """
-        fetch_logging_config('/account_data_fetcher/config/logging_config.ini')
         return logging.getLogger(__name__)
 
     @staticmethod

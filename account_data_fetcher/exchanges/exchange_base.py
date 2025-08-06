@@ -6,7 +6,6 @@ from typing import Optional
 from setproctitle import setproctitle
 import aiohttp 
 
-from infrastructure.log_handler import fetch_logging_config
 #TODO: For now, we only enforce two methods implementation, namely fetch_balance and fetch_positions. As such, process_request is quite statically defined as well. How could we untangle both so that we can define more abstract methods and have the process_request understands what to fetch dynamically.
 class ExchangeBase(ABC):
     """
@@ -34,7 +33,6 @@ class ExchangeBase(ABC):
         self.logger = self.init_logging()
 
     def init_logging(self):
-        fetch_logging_config('/account_data_fetcher/config/logging_config.ini')
         return logging.getLogger(__name__)
     
     @abstractmethod
