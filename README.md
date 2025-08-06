@@ -38,6 +38,9 @@ The [Account Data Fetcher](./account_data_fetcher/) follows a modular architectu
 
 Adding new components is straightforward—simply extend the existing base classes. The codebase uses verbose, Google-style docstrings for clarity and is filled with [To-dos](#todos) to guide contributors who are uncertain where to begin.
 
+### Note on the `async` branch
+For users on hardware-constrained, specifically I/O-bound systems, the [`async`](https://github.com/sfyll/enigma_capital/tree/async) branch offers a lightweight alternative. It refactors the original multi-process application into a single, efficient asynchronous process using the asyncio library. This new model eliminates the resource overhead of multiple processes, simplifying both deployment and execution and the expense of scalibility.
+
 ## Installation
 
 1. **Install virtualenv**:
