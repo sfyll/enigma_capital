@@ -45,19 +45,16 @@ class ExchangeBase(ABC):
         This method replaces the ZMQ publisher logic.
         """
         try:
-            while True:
-                balance_data = await self.fetch_balance()
-                positions_data = await self.fetch_positions()
-        
-                msg: dict = {
-                    "exchange": self.exchange,
-                    "balance": balance_data,
-                    "positions": positions_data 
-                }
+            balance_data = await self.fetch_balance()
+            positions_data = await self.fetch_positions()
+    
+            msg: dict = {
+                "exchange": self.exchange,
+                "balance": balance_data,
+                "positions": positions_data 
+            }
 
-                await self.output_queue.put(msg)
-
-                await asyncio.sleep(self.fetch_frequency)
+            await self.output_queue.put(msg)
         except asyncio.CancelledError:
             self.logger.info(f"Exchange fetcher for {self.exchange} is shutting down.")
         except Exception as e:
