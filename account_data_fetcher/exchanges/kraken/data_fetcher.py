@@ -12,17 +12,8 @@ import aiohttp
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class balanceMetaData:
-    timestamp: datetime
     balance_per_coin: Dict[str, str]
     balance_per_coin_in_dollars: Dict[str, float]
-
-    def is_acceptable_timestamp_detla(self, delta_in_seconds_allowed) -> bool:
-
-            dt = datetime.utcnow()
-
-            delta: timedelta = dt - self.timestamp
-
-            return delta.total_seconds() < delta_in_seconds_allowed
     
     def get_netliq(self) -> float:
         netliq: float = 0.0
@@ -83,8 +74,6 @@ class DataFetcher(ExchangeBase):
         self, 
         secrets: ApiMetaData, 
         session: aiohttp.ClientSession,
-        output_queue: asyncio.Queue,
-        fetch_frequency: int,
         sub_account_name: Optional[str] = None
     ) -> None:
         """
@@ -100,8 +89,6 @@ class DataFetcher(ExchangeBase):
         super().__init__(
             exchange=self._EXCHANGE, 
             session=session, 
-            output_queue=output_queue,
-            fetch_frequency=fetch_frequency
         )
         self.logger = logging.getLogger(__name__) 
         self._subaccount_name = sub_account_name
@@ -119,16 +106,11 @@ class DataFetcher(ExchangeBase):
             raise NotImplementedError
 
     async def __check_and_update_balances(self, delta_in_seconds: int = 120) -> balanceMetaData:
-        if self.balance_meta_data:
-            if self.balance_meta_data.is_acceptable_timestamp_detla(delta_in_seconds):
-                return self.balance_meta_data.balance_per_coin
-
         balance_per_coin = self.filter_balance_dict(await self.kraken_connector.get_balance())
         
         balance_per_coin_dollar = await self.get_balance_per_ticker_in_dollars(balance_per_coin)
         
         self.balance_meta_data: balanceMetaData = balanceMetaData(
-            timestamp=datetime.utcnow(),
             balance_per_coin= balance_per_coin,
             balance_per_coin_in_dollars=balance_per_coin_dollar
         )
@@ -172,7 +154,6 @@ class DataFetcher(ExchangeBase):
         return balances
 
     async def fetch_positions(self, accountType: str = "SPOT") -> dict:
-        await self.__update_balances(accountType)
         return self.balance_meta_data.get_position()
     
     @staticmethod

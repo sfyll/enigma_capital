@@ -5,6 +5,8 @@ import logging
 import time
 from typing import Dict, List, Optional, Set
 
+from account_data_fetcher.exchanges.exchange_base import ExchangeBase
+
 @dataclass
 class BalanceData:
     """
@@ -57,6 +59,7 @@ class ExchangeData:
     balance: BalanceData = field(default_factory=lambda: BalanceData(0))
     position: PositionData = field(default_factory=PositionData)
     last_fetch_timestamp: float = 0
+    report_timestamp_utc: Optional[datetime] = None
 
     def update(self, balance_and_positions_dict: dict) -> None:
         """
@@ -68,6 +71,8 @@ class ExchangeData:
         self.update_balance(balance_and_positions_dict["balance"])
         self.update_position(balance_and_positions_dict["positions"])
         self.last_fetch_timestamp = time.time()
+        if 'report_timestamp_utc' in balance_and_positions_dict:
+            self.report_timestamp_utc = balance_and_positions_dict['report_timestamp_utc']
 
     def update_balance(self, value: float):
         """
@@ -99,6 +104,7 @@ class AggregatedData:
         date (str): The last date data was sent.
         exchanges (Dict[str, ExchangeData]): Data for individual exchanges.
     """
+    logger: logging.Logger
     aggregation_interval: int
     expected_exchanges: Set[str]
     netliq: float = 0
@@ -128,7 +134,7 @@ class AggregatedData:
 
         #if aggregation interval == 24h, we're assuming we want to post on new day as defined by IB
         if self.aggregation_interval == 86400:
-            return self.__is_new_day()
+            return self.__are_all_reports_new_day()
         
         #if process was just launched, no need to check for all fetchers to have a new date
         if not self.date:
@@ -137,23 +143,32 @@ class AggregatedData:
         #last sent object was at least aggregation interval ago
         return time.time() - datetime.strptime(self.date, '%Y-%m-%d %H:%M:%S').timestamp() >= self.aggregation_interval
 
-    def __is_new_day(self) -> bool:
+    def __are_all_reports_new_day(self) -> bool:
         """
-        Check if it is a new day based on UTC time. Twicked for Interactive Brokers for which new days (and FLEX report publishing) is around 5am UTC.
- 
-        Returns:
-            bool: True if it is a new day, False otherwise.
+        Verifies that for a daily report, we have received data from ALL exchanges
+        that was generated on the current UTC calendar day.
         """
-        utc_time = datetime.utcnow()
-        
-        if utc_time.hour < 6:  # Wait until 7 AM UTC
-            return False
+        utc_now = datetime.utcnow()
+        utc_today = utc_now.date()
 
-        current_date = utc_time.date()
-        last_sent_date = datetime.strptime(self.date, "%Y-%m-%d %H:%M:%S").date() if self.date else None
+        # Check if we have already sent a report for today's date.
+        last_sent_date: Optional[date] = datetime.strptime(self.date, "%Y-%m-%d %H:%M:%S").date() if self.date else None
+        if last_sent_date == utc_today:
+            return False 
 
-        return current_date != last_sent_date
+        # Now, verify the data from all exchanges.
+        for ex_name, ex_data in self.exchanges.items():
+            if not ex_data.report_timestamp_utc:
+                self.logger.debug(f"Cannot send daily report: Exchange '{ex_name}' is missing a report timestamp.")
+                return False
+            if ex_data.report_timestamp_utc.date() != utc_today:
+                self.logger.debug(f"Cannot send daily report: Exchange '{ex_name}' has a stale report from {ex_data.report_timestamp_utc.date()}.")
+                return False
         
+        self.logger.info("All exchanges have provided reports for today. Ready to send.")
+        return True
+
+
     def __get_object_to_send(self) -> dict:
         """
         Prepare the object to be sent, updating necessary fields.
@@ -187,7 +202,6 @@ class AggregatedData:
 
         return to_send_object
 
-#TODO: Only localhost is supported for components communication. Allow support for other hosts!
 class DataAggregator:
     """Main class for aggregating data from multiple exchanges and publishing it to the writers.
 
@@ -197,19 +211,16 @@ class DataAggregator:
     Attributes:
         aggregated_data (AggregatedData): Data to be aggregated and sent.
     """
-    def __init__(self, aggregation_interval: int, input_queues: Dict[str, asyncio.Queue], output_queues: Dict[str, asyncio.Queue]) -> None:
-        for old_key in ("ib_flex", "ib_async"):
-            if old_key in input_queues:
-                input_queues["ib"] = input_queues.pop(old_key)
-                break
-
+    def __init__(self, aggregation_interval: int, fetcher_instances: Dict[str, ExchangeBase], output_queues: Dict[str, asyncio.Queue]) -> None:
         self.logger = self.init_logging()
-        self.input_queues = input_queues
+        self.fetcher_instances= fetcher_instances 
         self.output_queues = output_queues
         self.aggregated_data = AggregatedData(
+            logger=self.logger,
             aggregation_interval=aggregation_interval,
-            expected_exchanges=set(input_queues.keys())
+            expected_exchanges=set(fetcher_instances.keys())
         )
+        self.loop_frequency_seconds = aggregation_interval 
 
     def init_logging(self):
         """Initializes logging for the class.
@@ -219,62 +230,36 @@ class DataAggregator:
         """
         return logging.getLogger(__name__)
 
-    async def _forward_data(self, exchange_name: str, source_queue: asyncio.Queue, dest_queue: asyncio.Queue):
-        """
-        A long-running coroutine that forwards data from a source queue to a destination queue.
-        It wraps the data in a tuple with its exchange name.
-        """
-        while True:
-            try:
-                data = await source_queue.get()
-                await dest_queue.put((exchange_name, data))
-                source_queue.task_done()
-            except asyncio.CancelledError:
-                self.logger.info(f"Forwarder for {exchange_name} is shutting down.")
-                break
-            except Exception as e:
-                self.logger.error(f"Error in forwarder for {exchange_name}: {e}", exc_info=True)
-
-
     async def run(self):
         """
-        Main method to aggregate data from input queues and publish to output queues.
+        Main orchestration loop.
         """
-        merged_queue = asyncio.Queue()
-        forwarder_tasks = []
-
-        for name, queue in self.input_queues.items():
-            task = asyncio.create_task(self._forward_data(name, queue, merged_queue))
-            forwarder_tasks.append(task)
-        
-        self.logger.info(f"Started {len(forwarder_tasks)} queue forwarders.")
-
+        self.logger.info(f"Data Aggregator starting. Polling exchanges every {self.loop_frequency_seconds}s.")
         try:
             while True:
-                exchange_name, data = await merged_queue.get()
+                fetch_tasks = {name: fetcher.process_request() for name, fetcher in self.fetcher_instances.items()}
                 
-                self.logger.debug(f"Received from {exchange_name=}, {data=}")
+                for name, task in fetch_tasks.items():
+                    try:
+                        data = await task
+                        if name not in self.aggregated_data.exchanges:
+                            empty_pos = {k: [] for k in ["Symbol", "Multiplier", "Quantity", "Dollar Quantity"]}
+                            self.aggregated_data.exchanges[name] = ExchangeData(position=PositionData(data=empty_pos))
+                        
+                        self.aggregated_data.exchanges[name].update(data)
+                        self.logger.info(f"Successfully updated data for {name}.")
+                    except Exception as e:
+                        self.logger.error(f"Failed to fetch or update data for {name}: {e}", exc_info=True)
 
-                if exchange_name not in self.aggregated_data.exchanges:
-                    empty_positions = {k: [] for k in ["Symbol", "Multiplier", "Quantity", "Dollar Quantity"]}
-                    self.aggregated_data.exchanges[exchange_name] = ExchangeData(position=PositionData(data=empty_positions))
-                
-                self.aggregated_data.exchanges[exchange_name].update(data)
-                
                 objects_to_send = self.aggregated_data.get_object_if_ready()
                 if objects_to_send:
-                    self.logger.info(f"Aggregated object ready. Pushing to {len(self.output_queues)} writers.")
+                    self.logger.info(f"Data is valid and ready. Pushing aggregated object to {len(self.output_queues)} writers.")
                     await asyncio.gather(*(q.put(objects_to_send) for q in self.output_queues.values()))
                 
-                merged_queue.task_done()
+                await asyncio.sleep(self.loop_frequency_seconds)
 
         except asyncio.CancelledError:
             self.logger.info("Data aggregator is shutting down.")
         except Exception as e:
-            self.logger.error(f"DataAggregator failed: {e}", exc_info=True)
-        finally:
-            self.logger.info("Cancelling forwarder tasks...")
-            for task in forwarder_tasks:
-                task.cancel()
-            await asyncio.gather(*forwarder_tasks, return_exceptions=True)
-            self.logger.info("All forwarder tasks have been cancelled.")
+            self.logger.error(f"DataAggregator failed critically: {e}", exc_info=True)
+

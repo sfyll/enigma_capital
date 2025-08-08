@@ -22,15 +22,11 @@ class DataFetcher(ExchangeBase):
         self,
         secrets: ApiMetaData,
         session: aiohttp.ClientSession,
-        output_queue: asyncio.Queue,
-        fetch_frequency: int,
         sub_account_name: Optional[str] = None
     ) -> None:
         super().__init__(
             exchange=self._EXCHANGE,
             session=session,
-            output_queue=output_queue,
-            fetch_frequency=fetch_frequency
         )
         self.logger = logging.getLogger(__name__)
         self._subaccount_name = sub_account_name

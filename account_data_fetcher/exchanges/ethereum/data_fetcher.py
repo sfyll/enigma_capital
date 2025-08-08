@@ -17,32 +17,20 @@ from infrastructure.api_secret_getter import ApiMetaData
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class balanceMetaData:
-    timestamp: datetime
     balance_per_coin: Dict[str, float]
-
-    def is_acceptable_timestamp_delta(self, delta_in_seconds_allowed) -> bool:
-        delta: timedelta = datetime.utcnow() - self.timestamp
-        return delta.total_seconds() < delta_in_seconds_allowed
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class priceMetaData:
-    timestamp: datetime
     prices_per_coin: Dict[str, Dict[str, float]]
-
-    def is_acceptable_timestamp_delta(self, delta_in_seconds_allowed) -> bool:
-        delta: timedelta = datetime.utcnow() - self.timestamp
-        return delta.total_seconds() < delta_in_seconds_allowed
 
 class DataFetcher(ExchangeBase):
     __URL = "https://eth-mainnet.g.alchemy.com/v2/"
     __EXCHANGE = "Ethereum"
 
-    def __init__(self, secrets: ApiMetaData, session: aiohttp.ClientSession, output_queue: asyncio.Queue, fetch_frequency: int) -> None:
+    def __init__(self, secrets: ApiMetaData, session: aiohttp.ClientSession) -> None:
         super().__init__(
             exchange=self.__EXCHANGE,
             session=session,
-            output_queue=output_queue,
-            fetch_frequency=fetch_frequency
         )
         self.logger = logging.getLogger(__name__)
         self.price_meta_data: Optional[priceMetaData] = None
@@ -142,22 +130,16 @@ class DataFetcher(ExchangeBase):
 
     async def get_prices_for_coins_async(self, balance_by_coin: Dict[str, float]) -> None:
         """Asynchronously gets prices for coins, using cached data if fresh."""
-        if self.price_meta_data and self.price_meta_data.is_acceptable_timestamp_delta(self.fetch_frequency):
-            return
-
         coins_to_fetch = [coin for coin, balance in balance_by_coin.items() if "USD" not in coin.upper() and balance > 0]
 
         price_per_coin = await self.price_fetcher.get_prices(coins_to_fetch)
-        self.price_meta_data = priceMetaData(timestamp=datetime.utcnow(), prices_per_coin=price_per_coin)
+        self.price_meta_data = priceMetaData(prices_per_coin=price_per_coin)
 
     async def __get_total_balance_by_coin_async(self) -> dict:
         """Async wrapper for fetching balances, respects caching."""
-        if self.balance_meta_data and self.balance_meta_data.is_acceptable_timestamp_delta(self.fetch_frequency):
-            return self.balance_meta_data.balance_per_coin
-        
         balances = await self._run_in_executor(self.__get_total_balance_by_coin_sync)
         if balances:
-            self.balance_meta_data = balanceMetaData(timestamp=datetime.utcnow(), balance_per_coin=balances)
+            self.balance_meta_data = balanceMetaData(balance_per_coin=balances)
         return balances
 
     def __get_total_balance_by_coin_sync(self) -> dict:

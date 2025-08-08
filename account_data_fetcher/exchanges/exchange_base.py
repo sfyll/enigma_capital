@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import asyncio
+from datetime import datetime
 import logging
 from typing import Optional
 
@@ -12,7 +13,7 @@ class ExchangeBase(ABC):
     It fetches data from an exchange API and puts the resulting dictionary
     onto an asyncio.Queue for downstream processing.
     """
-    def __init__(self, exchange: str, session: aiohttp.ClientSession, output_queue: asyncio.Queue, fetch_frequency: int = 60*60) -> None:
+    def __init__(self, exchange: str, session: aiohttp.ClientSession) -> None:
         """    
         Initializes the ExchangeBase object.
 
@@ -24,8 +25,6 @@ class ExchangeBase(ABC):
         """
         self.exchange: str = exchange.lower()
         self.session = session
-        self.output_queue = output_queue
-        self.fetch_frequency = fetch_frequency
         self.logger = self.init_logging()
 
     def init_logging(self):
@@ -51,10 +50,12 @@ class ExchangeBase(ABC):
             msg: dict = {
                 "exchange": self.exchange,
                 "balance": balance_data,
-                "positions": positions_data 
+                "positions": positions_data,
+                "report_timestamp_utc": datetime.utcnow()
             }
 
-            await self.output_queue.put(msg)
+            return msg
+
         except asyncio.CancelledError:
             self.logger.info(f"Exchange fetcher for {self.exchange} is shutting down.")
         except Exception as e:

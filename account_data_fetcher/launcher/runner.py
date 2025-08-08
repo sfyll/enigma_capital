@@ -7,6 +7,7 @@ from logging import Logger
 from typing import List, Dict, Tuple, Optional, Any
 
 import aiohttp
+from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.runner_base import RunnerBase
 from infrastructure.api_secret_getter import ApiSecretGetter
 from account_data_fetcher.data_aggregator.data_aggregator import DataAggregator
@@ -54,15 +55,12 @@ class Runner(RunnerBase):
         secrets["gsheet"] = ApiSecretGetter.get_gsheet_meta_data(path, pwd)
 
         return {k.lower(): v for k, v in secrets.items()}
-    
+
     async def launch_all_as_tasks(self, frequency: int, exchanges: List[str], writers: List[str]):
         """
-        Launches all components (Exchanges, Aggregator, Writers) as concurrent asyncio
-        tasks, connecting them with asyncio.Queue instances.
+        Launches all components, instantiating fetchers to be managed by the
+        central DataAggregator (pull model).
         """
-        fetcher_to_aggregator_queues: Dict[str, asyncio.Queue] = {
-            name: asyncio.Queue() for name in self.get_lower_case_list_elements(exchanges)
-        }
         aggregator_to_writer_queues: Dict[str, asyncio.Queue] = {
             name: asyncio.Queue() for name in self.get_lower_case_list_elements(writers)
         }
@@ -70,14 +68,13 @@ class Runner(RunnerBase):
         all_tasks = []
         
         async with aiohttp.ClientSession() as http_session:
-            self.logger.info("Preparing Exchange Fetcher tasks...")
-            exchange_tasks = self._get_exchange_tasks(frequency, http_session, fetcher_to_aggregator_queues)
-            all_tasks.extend(exchange_tasks)
+            self.logger.info("Instantiating Exchange Fetcher objects...")
+            fetcher_instances = self._get_fetcher_instances(http_session, self.get_lower_case_list_elements(exchanges))
 
             self.logger.info("Preparing DataAggregator task...")
             aggregator_instance = DataAggregator(
                 aggregation_interval=frequency,
-                input_queues=fetcher_to_aggregator_queues,
+                fetcher_instances=fetcher_instances,  
                 output_queues=aggregator_to_writer_queues
             )
             aggregator_task = asyncio.create_task(aggregator_instance.run())
@@ -90,28 +87,32 @@ class Runner(RunnerBase):
             self.logger.info(f"All {len(all_tasks)} tasks created. Running forever...")
             await asyncio.gather(*all_tasks)
 
-    def _get_exchange_tasks(self, frequency: int, session: aiohttp.ClientSession, queues: Dict[str, asyncio.Queue]) -> List[asyncio.Task]:
-        tasks = []
-        for name in queues.keys():
+    def _get_fetcher_instances(self, session: aiohttp.ClientSession, exchanges_list: List[str]) -> Dict[str, 'ExchangeBase']:
+        """
+        Instantiates and returns a dictionary of fetcher objects, without
+        creating any running tasks for them.
+        """
+        instances = {}
+        for name in exchanges_list:
             module = import_module(f"account_data_fetcher.exchanges.{name}.data_fetcher")
             FetcherClass = getattr(module, "DataFetcher")
             
             init_params = inspect.signature(FetcherClass).parameters
             secret_keys = "ib" if "ib" in name else name
-            exchange_name = "ib" if name in ["ib_async", "ib_flex"] else name
+            
             possible_args = {
-                "fetch_frequency": frequency,
                 "secrets": self.secrets_per_process.get(secret_keys),
-                "session": session, 
-                "exchange": exchange_name,
-                "output_queue": queues[name]  # Pass the queue instead of a port
+                "session": session,
             }
 
             final_args = {key: value for key, value in possible_args.items() if key in init_params}
             self.logger.debug(f"Instantiating {name} with args: {list(final_args.keys())}")
             instance = FetcherClass(**final_args)
-            tasks.append(asyncio.create_task(instance.process_request()))
-        return tasks
+            if name in ["ib_async", "ib_flex"]:
+                instances["ib"] = instance
+            else:
+                instances[name] = instance
+        return instances
 
     def _get_writer_tasks(self, queues: Dict[str, asyncio.Queue]) -> List[asyncio.Task]:
         tasks = []
