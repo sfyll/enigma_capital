@@ -44,8 +44,8 @@ class Writer(WriterBase):
                         new_row = pd.DataFrame([sanitized_balances]).set_index("date")
                         
                         df = pd.concat([df, new_row])
-                        df.to_csv(balance_path)
-                        
+                        df.to_csv(balance_path, lineterminator='\n')
+
                     elif set_new_columns.issubset(set_existing_columns):
                         balances_to_write = {col: balances_data.get(col) or 0.0 for col in existing_columns}
                         with open(balance_path, 'a', newline='') as csvfile:
@@ -60,8 +60,7 @@ class Writer(WriterBase):
                         
             except (pd.errors.EmptyDataError, FileNotFoundError):
                 balances_to_write = {key: value or 0.0 for key, value in balances_data.items()}
-                pd.DataFrame([balances_to_write]).set_index("date").to_csv(balance_path)
-
+                pd.DataFrame([balances_to_write]).set_index("date").to_csv(balance_path, lineterminator='\n')
         async with self._balance_lock:
             await asyncio.to_thread(blocking_io_handler, balances)
 
