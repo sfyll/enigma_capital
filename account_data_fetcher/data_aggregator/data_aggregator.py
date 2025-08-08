@@ -220,7 +220,7 @@ class DataAggregator:
             aggregation_interval=aggregation_interval,
             expected_exchanges=set(fetcher_instances.keys())
         )
-        self.loop_frequency_seconds = aggregation_interval 
+        self.loop_frequency_seconds = 3600 #hardcoding poll to 1h. Won't work for those that need more granularity 
 
     def init_logging(self):
         """Initializes logging for the class.
