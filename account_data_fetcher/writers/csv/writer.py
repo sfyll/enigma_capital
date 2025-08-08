@@ -44,23 +44,24 @@ class Writer(WriterBase):
                         new_row = pd.DataFrame([sanitized_balances]).set_index("date")
                         
                         df = pd.concat([df, new_row])
-                        df.to_csv(balance_path, lineterminator='\n')
-
+                        df.to_csv(balance_path)
+                        
                     elif set_new_columns.issubset(set_existing_columns):
                         balances_to_write = {col: balances_data.get(col) or 0.0 for col in existing_columns}
                         with open(balance_path, 'a', newline='') as csvfile:
-                            writer = DictWriter(csvfile, fieldnames=existing_columns)
+                            writer = DictWriter(csvfile, fieldnames=existing_columns, lineterminator='\n')
                             writer.writerow(balances_to_write)
 
                 else:
                     balances_to_write = {key: value or 0.0 for key, value in balances_data.items()}
                     with open(balance_path, 'a', newline='') as csvfile:
-                        writer = DictWriter(csvfile, fieldnames=existing_columns)
+                        writer = DictWriter(csvfile, fieldnames=existing_columns, lineterminator='\n')
                         writer.writerow(balances_to_write)
                         
             except (pd.errors.EmptyDataError, FileNotFoundError):
                 balances_to_write = {key: value or 0.0 for key, value in balances_data.items()}
-                pd.DataFrame([balances_to_write]).set_index("date").to_csv(balance_path, lineterminator='\n')
+                pd.DataFrame([balances_to_write]).set_index("date").to_csv(balance_path)
+
         async with self._balance_lock:
             await asyncio.to_thread(blocking_io_handler, balances)
 
@@ -78,13 +79,13 @@ class Writer(WriterBase):
                     raise ValueError("CSV headers don't match. Exiting without writing since logic is not handled.")
 
                 with open(positions_path, 'a', newline='') as csvfile:
-                    writer = DictWriter(csvfile, fieldnames=positions_data.keys())
+                    writer = DictWriter(csvfile, fieldnames=positions_data.keys(), lineterminator='\n')
                     for row in zip(*positions_data.values()):
                         writer.writerow(dict(zip(positions_data.keys(), row)))
 
             except FileNotFoundError:
                 with open(positions_path, 'w', newline='') as csvfile:
-                    writer = DictWriter(csvfile, fieldnames=positions_data.keys())
+                    writer = DictWriter(csvfile, fieldnames=positions_data.keys(), lineterminator='\n')
                     writer.writeheader()
                     for row in zip(*positions_data.values()):
                         writer.writerow(dict(zip(positions_data.keys(), row)))
