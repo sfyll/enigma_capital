@@ -27,7 +27,7 @@ class netliqToTelgram(telegramHandler):
         return os.path.join(base, 'account_data_fetcher/csv_db/balance.csv')
     
     async def format_and_send_dataframe(self) -> bool:
-        df = pd.read_csv(self.netliq_path)
+        df = pd.read_csv(self.netliq_path, header=0, index_col=False)
         
         pd.options.display.float_format = "{:,.2f}".format
 

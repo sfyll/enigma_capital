@@ -84,14 +84,27 @@ class Runner:
 
         def is_new_day(self, path: str, today_datetime: Optional[datetime] = None) -> tuple[bool, int]:
             try:
-                df = pd.read_csv(path)
+                df = pd.read_csv(path, header=0, index_col=False)
+
+                df.dropna(subset=['date'], inplace=True)
+                if df.empty:
+                    return True, datetime.today()
+
             except FileNotFoundError:
-                return True
+                return True, datetime.today()
+
             if not today_datetime:
                 today_datetime = datetime.today()
-            today = today_datetime.weekday()
+
             last_day_df = df["date"].iloc[-1]
+            
+            if not isinstance(last_day_df, str):
+                self.logger.error(f"Expected a string for date but got {type(last_day_df)} with value {last_day_df}. Skipping this cycle.")
+                return False, today_datetime
+
             datetime_df = datetime.strptime(last_day_df, "%Y-%m-%d %H:%M:%S")
+            
+            today = today_datetime.weekday()
             today_df = datetime_df.weekday()
             self.logger.debug(f"{today_datetime=}, {last_day_df=}")
             if today_datetime.isocalendar().week != datetime_df.isocalendar().week:
