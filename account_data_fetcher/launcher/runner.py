@@ -7,10 +7,12 @@ from logging import Logger
 from typing import List, Dict, Tuple, Optional, Any
 
 import aiohttp
+from setproctitle import setproctitle
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.runner_base import RunnerBase
 from infrastructure.api_secret_getter import ApiSecretGetter
 from account_data_fetcher.data_aggregator.data_aggregator import DataAggregator
+from utilities.get_process_name import get_process_name
 
 class Runner(RunnerBase):
     def __init__(self, pwd: str, logger: Optional[Logger] = None):
@@ -146,6 +148,13 @@ if __name__ == "__main__":
     parser.add_argument('--writers', dest="writers", type=str, nargs='+', required=True, help="List of writers")
     
     args = parser.parse_args()
+    try:
+        proc_name = get_process_name(args.log_file)
+        setproctitle(proc_name)
+        logging.info(f"Process title set to '{proc_name}'")
+    except Exception as e:
+        raise e
+
     args = logging_handler(args)
     
     pwd = getpass("provide password for pk:")
