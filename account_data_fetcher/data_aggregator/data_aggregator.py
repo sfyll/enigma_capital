@@ -237,17 +237,28 @@ class DataAggregator:
         self.logger.info(f"Data Aggregator starting. Polling exchanges every {self.loop_frequency_seconds}s.")
         try:
             while True:
-                fetch_tasks = {name: fetcher.process_request() for name, fetcher in self.fetcher_instances.items()}
+                tasks = {name: fetcher.process_request() for name, fetcher in self.fetcher_instances.items()}
                 
-                for name, task in fetch_tasks.items():
+                results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+                
+                named_results = dict(zip(tasks.keys(), results))
+
+                for name, data in named_results.items():
                     try:
-                        data = await task
+                        if isinstance(data, Exception):
+                            raise data
+
+                        if data is None:
+                            self.logger.info(f"No data returned for {name}, but no exception was raised. Skipping update.")
+                            continue
+
                         if name not in self.aggregated_data.exchanges:
                             empty_pos = {k: [] for k in ["Symbol", "Multiplier", "Quantity", "Dollar Quantity"]}
                             self.aggregated_data.exchanges[name] = ExchangeData(position=PositionData(data=empty_pos))
                         
                         self.aggregated_data.exchanges[name].update(data)
                         self.logger.info(f"Successfully updated data for {name}.")
+
                     except Exception as e:
                         self.logger.error(f"Failed to fetch or update data for {name}: {e}", exc_info=True)
 
