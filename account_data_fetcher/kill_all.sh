@@ -1,5 +1,4 @@
 #!/usr/bin/env zsh
 
-pkill fetch_
-pkill data_aggregator
-pkill writer_
+pkill account_data_fetcher
+echo "Termination signal sent."
