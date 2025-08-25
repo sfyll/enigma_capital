@@ -117,13 +117,7 @@ class DataFetcher(ExchangeBase):
             "exchange": self._EXCHANGE,
             "balance": balance_value,
             "positions": positions_data,
-            # Freshness fields
-            "data_date": data_date,  # authoritative: same as toDate/fromDate for LastBusinessDay
-            "expected_last_business_day": expected_lbd,
-            "is_data_current": is_data_current,
-            # Keep for observability only
-            "report_generated_utc": report_generated_utc,
-            "period": balance_statement.period,
+            "report_timestamp_utc": datetime.now(self._tz_utc),
         }
 
     async def _fetch_report_async(self, query_id: str) -> FlexQueryResponse:
