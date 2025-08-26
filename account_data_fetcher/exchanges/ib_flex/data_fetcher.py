@@ -90,8 +90,8 @@ class DataFetcher(ExchangeBase):
 
         data_date = balance_statement.toDate
 
-        today_et = datetime.now(self._tz_et).date()
-        expected_lbd = self._last_business_day(today_et)
+        today_utc = datetime.now(self._tz_utc).date()
+        expected_lbd = self._last_business_day(today_utc)
 
         is_data_current = (data_date == expected_lbd)
 
@@ -117,7 +117,7 @@ class DataFetcher(ExchangeBase):
             "exchange": self._EXCHANGE,
             "balance": balance_value,
             "positions": positions_data,
-            "report_timestamp_utc": datetime.now(self._tz_utc),
+            "report_timestamp_utc": report_generated_utc if is_data_current else expected_lbd,
         }
 
     async def _fetch_report_async(self, query_id: str) -> FlexQueryResponse:
@@ -165,9 +165,9 @@ class DataFetcher(ExchangeBase):
             return False
         return True
 
-    def _last_business_day(self, today_et) -> datetime.date:
-        # Returns the most recent ET date that is a business day strictly before 'today_et'
-        d = today_et - timedelta(days=1)
+    def _last_business_day(self, today_utc) -> datetime.date:
+        # Returns the most recent ET date that is a business day strictly before 'today_utc'
+        d = today_utc - timedelta(days=1)
         while not self._is_business_day_et(d):
             d = d - timedelta(days=1)
         return d
