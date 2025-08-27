@@ -117,7 +117,7 @@ class DataFetcher(ExchangeBase):
             "exchange": self._EXCHANGE,
             "balance": balance_value,
             "positions": positions_data,
-            "report_timestamp_utc": report_generated_utc if is_data_current else expected_lbd,
+            "report_timestamp_utc": balance_statement.whenGenerated if is_data_current else today_utc,
         }
 
     async def _fetch_report_async(self, query_id: str) -> FlexQueryResponse:
