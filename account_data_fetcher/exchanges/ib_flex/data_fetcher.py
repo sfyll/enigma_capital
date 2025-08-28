@@ -90,8 +90,9 @@ class DataFetcher(ExchangeBase):
 
         data_date = balance_statement.toDate
 
-        today_utc = datetime.now(self._tz_utc).date()
-        expected_lbd = self._last_business_day(today_utc)
+        now_utc = datetime.now(self._tz_utc)
+        today_utc_date = now_utc.date()
+        expected_lbd = self._last_business_day(today_utc_date)
 
         is_data_current = (data_date == expected_lbd)
 
@@ -117,7 +118,7 @@ class DataFetcher(ExchangeBase):
             "exchange": self._EXCHANGE,
             "balance": balance_value,
             "positions": positions_data,
-            "report_timestamp_utc": balance_statement.whenGenerated if is_data_current else today_utc,
+            "report_timestamp_utc": balance_statement.whenGenerated if is_data_current else now_utc,
         }
 
     async def _fetch_report_async(self, query_id: str) -> FlexQueryResponse:
