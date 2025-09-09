@@ -91,8 +91,8 @@ class DataFetcher(ExchangeBase):
         data_date = balance_statement.toDate
 
         now_utc = datetime.now(self._tz_utc)
-        today_utc_date = now_utc.date()
-        expected_lbd = self._last_business_day(today_utc_date)
+        today_et_date = datetime.now(self._tz_et).date()
+        expected_lbd = self._last_business_day(today_et_date)
 
         is_data_current = (data_date == expected_lbd)
 
@@ -106,8 +106,9 @@ class DataFetcher(ExchangeBase):
             positions_data["Symbol"].append(pos.symbol)
             positions_data["Multiplier"].append(int(pos.multiplier))
             positions_data["Quantity"].append(int(pos.position))
-            dollar_qty = round(float(pos.markPrice) * float(pos.multiplier) * int(pos.position), 3)
-            positions_data["Dollar Quantity"].append(dollar_qty)
+            positions_data["Dollar Quantity"].append(
+                round(float(pos.markPrice) * float(pos.multiplier) * int(pos.position), 3)
+            )
 
         self.logger.info(
             f"IB Flex: data_date={data_date} (expected LBD={expected_lbd}, current={is_data_current}); "
@@ -118,7 +119,7 @@ class DataFetcher(ExchangeBase):
             "exchange": self._EXCHANGE,
             "balance": balance_value,
             "positions": positions_data,
-            "report_timestamp_utc": balance_statement.whenGenerated if is_data_current else now_utc,
+            "report_timestamp_utc": report_generated_utc if is_data_current else now_utc,
         }
 
     async def _fetch_report_async(self, query_id: str) -> FlexQueryResponse:
