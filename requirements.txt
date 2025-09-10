@@ -16,3 +16,4 @@ zmq==0.0.0
 mplcursors==0.6
 PyQt5==5.15.11
 holidays==0.79
+hyperliquid-python-sdk==0.8.18
