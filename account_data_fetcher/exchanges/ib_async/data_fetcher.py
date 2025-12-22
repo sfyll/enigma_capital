@@ -1,6 +1,9 @@
+import asyncio
+import aiohttp
 from ib_insync import *
 
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
+from infrastructure.api_secret_getter import ApiMetaData
 
 
 class DataFetcher(ExchangeBase):
@@ -10,8 +13,9 @@ class DataFetcher(ExchangeBase):
     __TWS_PORT = 7496
     __HOST = "127.0.0.1"
 
-    def __init__(self, port_number: int, app: str = "GATEWAY"):
-        super().__init__(port_number, self.__EXCHANGE)
+    def __init__(self, secrets: ApiMetaData, session: aiohttp.ClientSession, app: str = "GATEWAY"):
+        super().__init__(exchange=self.__EXCHANGE, session=session)
+        self._secrets = secrets
         self.__on_start(app)
         self.netliq: float | None = None
 
@@ -30,8 +34,8 @@ class DataFetcher(ExchangeBase):
             gateway_v,
             gateway=is_gateway,
             tradingMode="live",
-            userid=self.api_meta_data[self.__EXCHANGE].key,
-            password=self.api_meta_data[self.__EXCHANGE].secret,
+            userid=self._secrets.key,
+            password=self._secrets.secret,
             ibcIni="/opt/ibc/config.ini",
         )
         self.ib = IB()
@@ -45,20 +49,31 @@ class DataFetcher(ExchangeBase):
     def is_connected(self) -> bool:
         return self.ib.isConnected()
 
-    def fetch_balance(self) -> float:
+    def _fetch_balance_sync(self) -> float:
         while self.netliq is None:
             self.ib.sleep(1)
-        else:
-            return self.netliq
+        return self.netliq
+
+    async def fetch_balance(self) -> float:
+        return await asyncio.to_thread(self._fetch_balance_sync)
 
     # TODO: Fetch positions
-    def fetch_positions(self) -> float: ...
+    async def fetch_positions(self) -> float:
+        raise NotImplementedError
 
 
 if __name__ == "__main__":
+    import asyncio
     import os
+    from getpass import getpass
 
-    path = os.path.realpath(os.path.dirname(__file__))
-    pwd = ""
-    executor = InteractiveBrokersAppAsync(path, pwd, app="GATEWAY")
-    summary = executor.get_netliq()
+    from account_data_fetcher.launcher.runner import Runner
+
+    async def _main():
+        pwd = getpass("provide password for pk:")
+        runner = Runner(pwd)
+        async with aiohttp.ClientSession() as session:
+            executor = DataFetcher(runner.secrets_per_process["ib"], session, app="GATEWAY")
+            print(await executor.fetch_balance())
+
+    asyncio.run(_main())

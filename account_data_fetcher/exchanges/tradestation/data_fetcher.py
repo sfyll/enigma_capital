@@ -5,6 +5,8 @@ import os
 import time
 import urllib.parse
 
+import aiohttp
+import asyncio
 import pgpy
 import requests
 
@@ -45,14 +47,14 @@ class DataFetcher(ExchangeBase):
 
     def __init__(
         self,
-        password: str,
         secrets: ApiMetaData,
-        port_number: int,
+        session: aiohttp.ClientSession,
+        password: str | None = None,
         paper_trading=False,
         cache_state=True,
         refresh_enabled=True,
     ) -> None:
-        super().__init__(port_number, self.__EXCHANGE)
+        super().__init__(exchange=self.__EXCHANGE, session=session)
         self.config = {
             "client_id": secrets.key,
             "client_secret": secrets.secret,
@@ -72,6 +74,10 @@ class DataFetcher(ExchangeBase):
 
         self.account_meta_data: dict[str, AccountMetaData] = {}
 
+        if password is None:
+            password = secrets.other_fields.get("Password") or secrets.other_fields.get("password")
+        if not password:
+            raise ValueError("TradeStation password missing; provide it or set it in secrets.other_fields.")
         self.decryption_password: str = password
         current_directory = os.path.dirname(__file__)
         self.base_path = os.path.abspath(os.path.join(current_directory, "..", "..", ".."))
@@ -668,7 +674,7 @@ class DataFetcher(ExchangeBase):
 
         return response
 
-    def fetch_balance(self) -> int:
+    def _fetch_balance_sync(self) -> float:
         self.account_meta_data = {key: value.reset() for key, value in self.account_meta_data.items()}
         self.account_balances()
         self.account_wallets()
@@ -679,6 +685,9 @@ class DataFetcher(ExchangeBase):
                 account_total_balance += self.account_meta_data[account_id].Equity
 
         return round(account_total_balance, 3)
+
+    async def fetch_balance(self) -> float:
+        return await asyncio.to_thread(self._fetch_balance_sync)
 
     def account_positions(self, account_keys: list[str] | None = None, symbols: list[str] | None = None) -> dict:
         """Grabs all the account positions.
@@ -734,14 +743,13 @@ class DataFetcher(ExchangeBase):
 
         return response
 
-    def fetch_positions(self):
+    def _fetch_positions_sync(self) -> dict:
         positions: dict = self.account_positions()
 
         data_to_return = {"Symbol": [], "Multiplier": [], "Quantity": [], "Dollar Quantity": []}
 
         for position in positions["Positions"]:
             data_to_return["Symbol"].append(position["Symbol"])
-            # extrapolate multiplier
             multiplier = (
                 float(position["MarketValue"])
                 / abs(int(position["Quantity"]))
@@ -753,17 +761,28 @@ class DataFetcher(ExchangeBase):
 
         return data_to_return
 
+    async def fetch_positions(self) -> dict:
+        return await asyncio.to_thread(self._fetch_positions_sync)
+
 
 if __name__ == "__main__":
     from getpass import getpass
 
     from account_data_fetcher.launcher.runner import Runner
 
-    pwd = getpass("provide password for pk:")
-    runner = Runner(pwd)
-    current_path = os.path.realpath(os.path.dirname(__file__))
-    executor = DataFetcher(pwd, runner.secrets_per_process["tradestation"], runner.port_per_process["tradestation"])
-    balances = executor.fetch_balance()
-    print(f"1 = {balances=}")
-    balances = executor.fetch_balance()
-    print(f"2 = {balances=}")
+    import asyncio
+
+    async def _main():
+        pwd = getpass("provide password for pk:")
+        runner = Runner(pwd)
+        ts_password = getpass("provide TradeStation password:")
+        async with aiohttp.ClientSession() as session:
+            executor = DataFetcher(
+                runner.secrets_per_process["tradestation"],
+                session,
+                password=ts_password,
+            )
+            balances = executor.fetch_balance()
+            print(f"{balances=}")
+
+    asyncio.run(_main())

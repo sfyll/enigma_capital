@@ -1,6 +1,7 @@
 import os
 
 import aiohttp
+import asyncio
 
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from account_data_fetcher.exchanges.kucoin.exception import InvalidRequestError
@@ -22,8 +23,8 @@ class DataFetcher(ExchangeBase):
             api_key=secrets.key, api_secret=secrets.secret, passphrase=secrets.other_fields["Passphrase"]
         )
 
-    def fetch_balance(self, accountType="UNIFIED") -> float:
-        netliq = self.__get_balances()
+    async def fetch_balance(self, accountType="UNIFIED") -> float:
+        netliq = await asyncio.to_thread(self.__get_balances)
         return round(netliq, 2)
 
     def __get_balances(self) -> float:
@@ -46,8 +47,8 @@ class DataFetcher(ExchangeBase):
 
         return round(spot_netliq)
 
-    def fetch_positions(self, accountType="UNIFIED") -> dict:
-        return self.__get_spot_positions()
+    async def fetch_positions(self, accountType="UNIFIED") -> dict:
+        return await asyncio.to_thread(self.__get_spot_positions)
 
     def __get_spot_positions(self) -> dict:
         data_to_return = {"Symbol": [], "Multiplier": [], "Quantity": [], "Dollar Quantity": []}
@@ -79,13 +80,17 @@ class DataFetcher(ExchangeBase):
 
 
 if __name__ == "__main__":
+    import asyncio
     from getpass import getpass
 
-    pwd = getpass("provide password for pk:")
-    executor = DataFetcher(os.path.realpath(os.path.dirname(__file__)), pwd)
-    # TODO:do below but with asset split, right now gives only derivatives view.
-    # print(executor.kucoin_connector.get_position(category="linear", settleCoin="USDT"))
-    # print(executor.get_positions("SPOT"))
-    print(executor.get_positions("UNIFIED"))
-    print(executor.get_positions("FUTURE"))
-    # print(executor.get_netliq())
+    from account_data_fetcher.launcher.runner import Runner
+
+    async def _main():
+        pwd = getpass("provide password for pk:")
+        runner = Runner(pwd)
+        async with aiohttp.ClientSession() as session:
+            executor = DataFetcher(runner.secrets_per_process["kucoin"], session)
+            print(await executor.fetch_positions("UNIFIED"))
+            print(await executor.fetch_positions("FUTURE"))
+
+    asyncio.run(_main())

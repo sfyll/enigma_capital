@@ -1,5 +1,8 @@
 import os
 
+import aiohttp
+import asyncio
+
 from account_data_fetcher.exchanges.bybit.bybit_connector import bybitApiConnector
 from account_data_fetcher.exchanges.bybit.exception import InvalidRequestError
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
@@ -11,13 +14,15 @@ class DataFetcher(ExchangeBase):
     _EXCHANGE = "BYBIT"
     _ENDPOINT = "https://api.bybit.com"
 
-    def __init__(self, secrets: ApiMetaData, port_number: int, sub_account_name: str | None = None) -> None:
-        super().__init__(port_number, self._EXCHANGE)
+    def __init__(
+        self, secrets: ApiMetaData, session: aiohttp.ClientSession, sub_account_name: str | None = None
+    ) -> None:
+        super().__init__(exchange=self._EXCHANGE, session=session)
         self._subaccount_name = sub_account_name
         self.bybit_connector = bybitApiConnector(api_key=secrets.key, api_secret=secrets.secret)
 
-    def fetch_balance(self, accountType="UNIFIED") -> float:
-        netliq = self.__get_balances(accountType)
+    async def fetch_balance(self, accountType="UNIFIED") -> float:
+        netliq = await asyncio.to_thread(self.__get_balances, accountType)
         return round(netliq, 2)
 
     def __get_balances(self, accountType="UNIFIED") -> float:
@@ -56,12 +61,12 @@ class DataFetcher(ExchangeBase):
 
             return round(spot_netliq + derivative_balance)
 
-    def fetch_positions(self, accountType="UNIFIED") -> dict:
+    async def fetch_positions(self, accountType="UNIFIED") -> dict:
         data_to_return = {"Symbol": [], "Multiplier": [], "Quantity": [], "Dollar Quantity": []}
 
         if accountType == "UNIFIED":
-            future_positions = self.__get_derivatives_positions()
-            unified_positions = self.__get_unified_positions()
+            future_positions = await asyncio.to_thread(self.__get_derivatives_positions)
+            unified_positions = await asyncio.to_thread(self.__get_unified_positions)
 
             all_positions = [future_positions, unified_positions]
 
@@ -81,8 +86,8 @@ class DataFetcher(ExchangeBase):
             return data_to_return
 
         else:
-            spot_positions = self.__get_spot_positions()
-            future_positions = self.__get_derivatives_positions()
+            spot_positions = await asyncio.to_thread(self.__get_spot_positions)
+            future_positions = await asyncio.to_thread(self.__get_derivatives_positions)
 
             all_positions = [spot_positions, future_positions]
 
@@ -101,13 +106,13 @@ class DataFetcher(ExchangeBase):
 
             return data_to_return
 
-    def fetch_specific_positions(self, market: str) -> dict:
+    async def fetch_specific_positions(self, market: str) -> dict:
         if market == "SPOT":
-            return self.__get_spot_positions()
+            return await asyncio.to_thread(self.__get_spot_positions)
         elif market == "FUTURE":
-            return self.__get_derivatives_positions()
+            return await asyncio.to_thread(self.__get_derivatives_positions)
         elif market == "UNIFIED":
-            return self.__get_unified_positions()
+            return await asyncio.to_thread(self.__get_unified_positions)
         else:
             raise NotImplementedError(f"Unkown market {market}")
 
@@ -207,13 +212,17 @@ class DataFetcher(ExchangeBase):
 
 
 if __name__ == "__main__":
+    import asyncio
     from getpass import getpass
 
-    pwd = getpass("provide password for pk:")
-    executor = bybitDataFetcher(os.path.realpath(os.path.dirname(__file__)), pwd)
-    # TODO:do below but with asset split, right now gives only derivatives view.
-    # print(executor.bybit_connector.get_position(category="linear", settleCoin="USDT"))
-    # print(executor.get_positions("SPOT"))
-    print(executor.get_positions("UNIFIED"))
-    print(executor.get_positions("FUTURE"))
-    # print(executor.get_netliq())
+    from account_data_fetcher.launcher.runner import Runner
+
+    async def _main():
+        pwd = getpass("provide password for pk:")
+        runner = Runner(pwd)
+        async with aiohttp.ClientSession() as session:
+            executor = DataFetcher(runner.secrets_per_process["bybit"], session)
+            print(await executor.fetch_positions("UNIFIED"))
+            print(await executor.fetch_positions("FUTURE"))
+
+    asyncio.run(_main())
