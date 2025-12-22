@@ -40,7 +40,7 @@ def logging_handler(args):
     config_buffer = StringIO()
     config.write(config_buffer)
     config_buffer.seek(0)  # Rewind the buffer to the beginning
-
+    print(config_buffer.getvalue())
     logging.config.fileConfig(config_buffer)
 
     return args
