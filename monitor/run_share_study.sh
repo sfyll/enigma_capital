@@ -1,7 +1,13 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
-# Determine the script's directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Determine the script's directory (shell-agnostic)
+if [ -n "$BASH_VERSION" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+elif [ -n "$ZSH_VERSION" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+else
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 
 # Define a function to find the project root
 find_project_root() {

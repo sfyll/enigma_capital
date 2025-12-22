@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env sh
 
 case "$1" in
     -d|--daemon)
@@ -10,7 +10,14 @@ case "$1" in
 esac
 
 # Find project root by locating pyproject.toml
-SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+# Shell-agnostic way to get script directory (works in bash, zsh, and other POSIX shells)
+if [ -n "$BASH_VERSION" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+elif [ -n "$ZSH_VERSION" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+else
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 PROJECT_ROOT="$SCRIPT_DIR"
 while [[ "$PROJECT_ROOT" != "/" ]]; do
     if [[ -f "$PROJECT_ROOT/pyproject.toml" ]]; then
