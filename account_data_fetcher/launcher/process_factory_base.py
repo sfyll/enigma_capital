@@ -1,9 +1,9 @@
+import inspect
 from abc import ABC, abstractmethod
 from importlib import import_module
-import inspect
+
 
 class ProcessFactoryBase(ABC):
-
     @classmethod
     def get_process_class(cls, process_name: str):
         """
@@ -11,7 +11,7 @@ class ProcessFactoryBase(ABC):
 
         Args:
             process_name (str): Name of the process.
-            
+
         Returns:
             Class: The class object corresponding to the process name.
 
@@ -19,7 +19,7 @@ class ProcessFactoryBase(ABC):
             Exception: If importing the module or getting the attribute fails.
         """
         module_name = cls.get_module_name(process_name)
-        
+
         try:
             exchange_module = import_module(module_name)
             return getattr(exchange_module, cls._STANDARDIZED_CLASS_NAME)
@@ -34,13 +34,13 @@ class ProcessFactoryBase(ABC):
 
         Args:
             process_name (str): Name of the process.
-            
+
         Returns:
             str: The module name.
         """
         pass
 
-    #TODO: Process request is the only entry-point at the factory level. This could be made more generic to accomodate for other entry-points and inputs as the application scales.
+    # TODO: Process request is the only entry-point at the factory level. This could be made more generic to accomodate for other entry-points and inputs as the application scales.
     @classmethod
     async def launch_process_and_run_request_processor(cls, process_name: str, *args, **kwargs) -> None:
         """
@@ -55,7 +55,7 @@ class ProcessFactoryBase(ABC):
 
         signature = inspect.signature(process_instance.__init__)
         filtered_kwargs = {key: value for key, value in kwargs.items() if key in signature.parameters}
-        
+
         launched_instance = process_instance(*args, **filtered_kwargs)
 
         await launched_instance.process_request()

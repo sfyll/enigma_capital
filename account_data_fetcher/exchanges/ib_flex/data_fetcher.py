@@ -1,23 +1,21 @@
 import asyncio
-import logging
-from typing import Dict
 import functools
-from datetime import timedelta, datetime
+import logging
 import socket
+from datetime import datetime, timedelta
+from time import sleep
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
+
+import aiohttp
+import holidays as _holidays
+import requests
+from ibflex import parser as ibparser
+from ibflex.client import ResponseCodeError, check_statement_response, request_statement
+from ibflex.Types import FlexQueryResponse, OpenPosition
 
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
-
-import aiohttp
-from ibflex import parser as ibparser
-from ibflex.Types import OpenPosition, FlexQueryResponse
-from ibflex.client import ResponseCodeError, request_statement, check_statement_response
-import requests
-from time import sleep
-from zoneinfo import ZoneInfo
-
-import holidays as _holidays
 
 
 class DataFetcher(ExchangeBase):
@@ -66,9 +64,7 @@ class DataFetcher(ExchangeBase):
             data_to_return["Symbol"].append(position.symbol)
             data_to_return["Multiplier"].append(int(position.multiplier))
             data_to_return["Quantity"].append(int(position.position))
-            dollar_quantity = round(
-                float(position.markPrice) * float(position.multiplier) * int(position.position), 3
-            )
+            dollar_quantity = round(float(position.markPrice) * float(position.multiplier) * int(position.position), 3)
             data_to_return["Dollar Quantity"].append(dollar_quantity)
 
         return data_to_return
@@ -80,7 +76,7 @@ class DataFetcher(ExchangeBase):
             "query_id_position": secrets.other_fields["Position_query_id"],
         }
 
-    async def process_request(self) -> Dict:
+    async def process_request(self) -> dict:
         balance_report_task = self._fetch_report_async(self.account_and_query_ids["query_id_balance"])
         position_report_task = self._fetch_report_async(self.account_and_query_ids["query_id_position"])
         balance_response, position_response = await asyncio.gather(balance_report_task, position_report_task)
@@ -94,7 +90,7 @@ class DataFetcher(ExchangeBase):
         today_et_date = datetime.now(self._tz_et).date()
         expected_lbd = self._last_business_day(today_et_date)
 
-        is_data_current = (data_date == today_et_date)
+        is_data_current = data_date == today_et_date
 
         report_generated_utc = self._to_utc_from_eastern(balance_statement.whenGenerated)
 
@@ -285,9 +281,7 @@ class DataFetcher(ExchangeBase):
                         continue
 
             if attempt < max_retries:
-                self.logger.warning(
-                    f"All Flex base URLs failed on attempt {attempt}. Backing off 15s before retry."
-                )
+                self.logger.warning(f"All Flex base URLs failed on attempt {attempt}. Backing off 15s before retry.")
                 sleep(15)
 
         raise Exception(f"Failed to fetch report for query '{query_id}' after {max_retries} attempts.")

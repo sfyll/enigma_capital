@@ -8,14 +8,12 @@ class FailedRequestError(Exception):
         status_code -- The code number returned.
         time -- The time of the error.
     """
+
     def __init__(self, request, message, time):
         self.request = request
         self.message = message
         self.time = time
-        super().__init__(
-            f'{message.capitalize()}  (ErrTime: {time})'
-            f'.\nRequest → {request}.'
-        )
+        super().__init__(f"{message.capitalize()}  (ErrTime: {time})" f".\nRequest → {request}.")
 
 
 class InvalidRequestError(Exception):
@@ -28,11 +26,9 @@ class InvalidRequestError(Exception):
         status_code -- The code number returned.
         time -- The time of the error.
     """
+
     def __init__(self, request, message, time):
         self.request = request
         self.message = message
         self.time = time
-        super().__init__(
-            f'{message.capitalize()} (ErrTime: {time})'
-            f'.\nRequest → {request}.'
-        )
+        super().__init__(f"{message.capitalize()} (ErrTime: {time})" f".\nRequest → {request}.")

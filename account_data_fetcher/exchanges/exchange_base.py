@@ -1,20 +1,21 @@
-from abc import ABC, abstractmethod
 import asyncio
-from datetime import datetime
 import logging
-from typing import Optional
+from abc import ABC, abstractmethod
+from datetime import datetime
 
-import aiohttp 
+import aiohttp
 
-#TODO: For now, we only enforce two methods implementation, namely fetch_balance and fetch_positions. As such, process_request is quite statically defined as well. How could we untangle both so that we can define more abstract methods and have the process_request understands what to fetch dynamically.
+
+# TODO: For now, we only enforce two methods implementation, namely fetch_balance and fetch_positions. As such, process_request is quite statically defined as well. How could we untangle both so that we can define more abstract methods and have the process_request understands what to fetch dynamically.
 class ExchangeBase(ABC):
     """
     Base class for exchange-related data fetching.
     It fetches data from an exchange API and puts the resulting dictionary
     onto an asyncio.Queue for downstream processing.
     """
+
     def __init__(self, exchange: str, session: aiohttp.ClientSession) -> None:
-        """    
+        """
         Initializes the ExchangeBase object.
 
         Args:
@@ -29,13 +30,13 @@ class ExchangeBase(ABC):
 
     def init_logging(self):
         return logging.getLogger(__name__)
-    
+
     @abstractmethod
-    async def fetch_balance(self, accountType: Optional[str] = None) -> float:
+    async def fetch_balance(self, accountType: str | None = None) -> float:
         pass
 
     @abstractmethod
-    async def fetch_positions(self, accountType: Optional[str] = None) -> dict:
+    async def fetch_positions(self, accountType: str | None = None) -> dict:
         pass
 
     async def process_request(self):
@@ -46,12 +47,12 @@ class ExchangeBase(ABC):
         try:
             balance_data = await self.fetch_balance()
             positions_data = await self.fetch_positions()
-    
+
             msg: dict = {
                 "exchange": self.exchange,
                 "balance": balance_data,
                 "positions": positions_data,
-                "report_timestamp_utc": datetime.utcnow()
+                "report_timestamp_utc": datetime.utcnow(),
             }
 
             return msg

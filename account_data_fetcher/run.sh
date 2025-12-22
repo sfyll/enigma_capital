@@ -9,8 +9,21 @@ case "$1" in
         ;;
 esac
 
-cd $ENIGMA
+# Find project root by locating pyproject.toml
+SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+PROJECT_ROOT="$SCRIPT_DIR"
+while [[ "$PROJECT_ROOT" != "/" ]]; do
+    if [[ -f "$PROJECT_ROOT/pyproject.toml" ]]; then
+        break
+    fi
+    PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
+done
 
-source env/bin/activate
+if [[ ! -f "$PROJECT_ROOT/pyproject.toml" ]]; then
+    echo "Error: Could not find project root (pyproject.toml not found)"
+    exit 1
+fi
 
-python3 -m account_data_fetcher.launcher.runner --log-file ~/log/account_data_fetcher.log --seconds 86400 -v -q --exchanges Binance BYBIT Ethereum TradeStation IB_flex Kraken Rsk KUCOIN --writers csv gsheet
+cd "$PROJECT_ROOT"
+
+poetry run python -m account_data_fetcher.launcher.runner --log-file ~/log/account_data_fetcher.log --seconds 30 -vvvvvvv -q --exchanges hyperliquid --writers csv 

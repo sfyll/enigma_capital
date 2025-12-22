@@ -1,18 +1,17 @@
 import dataclasses
+import json
 import logging
 import os
 import time
-import json
-from typing import Dict, List, Optional
+import urllib.parse
 
 import pgpy
 import requests
-import urllib.parse
-
-from utilities.encryptor import get_decrypted_ts_state, encrypt_and_write_ts_to_file
 
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
+from utilities.encryptor import encrypt_and_write_ts_to_file, get_decrypted_ts_state
+
 
 @dataclasses.dataclass(init=True, eq=True, repr=True)
 class AccountMetaData:
@@ -32,7 +31,10 @@ class AccountMetaData:
         self.UnclearedDeposit = 0.0
         return self
 
+
 """https://github.com/areed1192/tradestation-python-api/blob/master/ts/client.py"""
+
+
 class DataFetcher(ExchangeBase):
     __AUTH_ENDPOINT = "https://signin.tradestation.com/oauth/token"
     __REDIRECT_URI = "http://localhost:3000/"
@@ -41,41 +43,48 @@ class DataFetcher(ExchangeBase):
     __API_VERSION = "v3"
     __PAPER_RESOURCE = "https://sim-api.tradestation.com"
 
-    def __init__(self, password: str, secrets: ApiMetaData, port_number: int, paper_trading = False,
-                cache_state = True, refresh_enabled = True) -> None:
+    def __init__(
+        self,
+        password: str,
+        secrets: ApiMetaData,
+        port_number: int,
+        paper_trading=False,
+        cache_state=True,
+        refresh_enabled=True,
+    ) -> None:
         super().__init__(port_number, self.__EXCHANGE)
         self.config = {
-            'client_id':secrets.key,
-            'client_secret': secrets.secret,
-            'username': secrets.other_fields["Username"],
-            'redirect_uri': self.__REDIRECT_URI,
-            'resource': self.__RESOURCE,
-            'paper_resource': self.__PAPER_RESOURCE,
-            'api_version': self.__API_VERSION,
-            'paper_api_version': self.__API_VERSION,
-            'auth_endpoint': self.__AUTH_ENDPOINT,
-            'cache_state': cache_state,
-            'refresh_enabled': refresh_enabled,
-            'paper_trading': paper_trading
+            "client_id": secrets.key,
+            "client_secret": secrets.secret,
+            "username": secrets.other_fields["Username"],
+            "redirect_uri": self.__REDIRECT_URI,
+            "resource": self.__RESOURCE,
+            "paper_resource": self.__PAPER_RESOURCE,
+            "api_version": self.__API_VERSION,
+            "paper_api_version": self.__API_VERSION,
+            "auth_endpoint": self.__AUTH_ENDPOINT,
+            "cache_state": cache_state,
+            "refresh_enabled": refresh_enabled,
+            "paper_trading": paper_trading,
         }
 
         self.logger = logging.getLogger(__name__)
 
-        self.account_meta_data: Dict[str, AccountMetaData] = {}
+        self.account_meta_data: dict[str, AccountMetaData] = {}
 
         self.decryption_password: str = password
         current_directory = os.path.dirname(__file__)
-        self.base_path = os.path.abspath(os.path.join(current_directory, '..', '..', '..'))
+        self.base_path = os.path.abspath(os.path.join(current_directory, "..", "..", ".."))
         self.key, _ = pgpy.PGPKey.from_file(self.base_path + "/account_data_fetcher/secrets/.pk.txt")
 
         # initalize the client to either use paper trading account or regular account.
-        if self.config['paper_trading']:
+        if self.config["paper_trading"]:
             self.paper_trading_mode = True
         else:
             self.paper_trading_mode = False
 
         # call the _state_manager method and update the state to init (initalized)
-        self._state_manager('init')
+        self._state_manager("init")
 
         # define a new attribute called 'authstate' and initalize it to '' (Blank). This will be used by our login function.
         self.authstate = False
@@ -90,14 +99,13 @@ class DataFetcher(ExchangeBase):
         """
 
         # Define the string representation.
-        str_representation = '<TradeStation Client (logged_in={log_in}, authorized={auth_state})>'.format(
-            log_in=self.state['logged_in'],
-            auth_state=self.authstate
+        str_representation = "<TradeStation Client (logged_in={log_in}, authorized={auth_state})>".format(
+            log_in=self.state["logged_in"], auth_state=self.authstate
         )
 
         return str_representation
 
-    def headers(self, mode: str = None) -> Dict:
+    def headers(self, mode: str = None) -> dict:
         """Sets the headers for the request.
         Overview:
         ----
@@ -112,25 +120,23 @@ class DataFetcher(ExchangeBase):
         """
 
         # Grab the Access Token.
-        token = self.state['access_token']
+        token = self.state["access_token"]
 
         # Create the headers dictionary
-        headers = {
-            'Authorization': 'Bearer {access_token}'.format(access_token=token)
-        }
+        headers = {"Authorization": f"Bearer {token}"}
 
         # Set the Mode.
-        if mode == 'application/json':
-            headers['Content-type'] = 'application/json'
-        elif mode == 'chunked':
-            headers['Transfer-Encoding'] = 'Chunked'
+        if mode == "application/json":
+            headers["Content-type"] = "application/json"
+        elif mode == "chunked":
+            headers["Transfer-Encoding"] = "Chunked"
 
         return headers
 
     def _api_endpoint(self, url: str) -> str:
         """Creates an API URL.
         Overview:
-        ----  
+        ----
         Convert relative endpoint (e.g., 'quotes') to full API endpoint.
         Arguments:
         ----
@@ -142,11 +148,9 @@ class DataFetcher(ExchangeBase):
 
         # paper trading uses a different base url compared to regular trading.
         if self.paper_trading_mode:
-            full_url = '/'.join([self.config['paper_resource'],
-                                 self.config['paper_api_version'], url])
+            full_url = "/".join([self.config["paper_resource"], self.config["paper_api_version"], url])
         else:
-            full_url = '/'.join([self.config['resource'],
-                                 self.config['api_version'], url])
+            full_url = "/".join([self.config["resource"], self.config["api_version"], url])
 
         return full_url
 
@@ -155,17 +159,17 @@ class DataFetcher(ExchangeBase):
         Overview:
         ----
         Manages the self.state dictionary. Initalize State will set
-        the properties to their default value. Save will save the 
+        the properties to their default value. Save will save the
         current state if 'cache_state' is set to TRUE.
         Arguments:
         ----
         name (str): action argument must of one of the following:
             'init' -- Initalize State.
-            'save' -- Save the current state.         
+            'save' -- Save the current state.
         """
 
         # Grab the current directory of the client file, that way we can store the JSON file in the same folder.
-        filename = '.ts_state_enc.txt'
+        filename = ".ts_state_enc.txt"
         file_path = self.base_path + "/account_data_fetcher/secrets/" + filename
 
         try:
@@ -174,29 +178,28 @@ class DataFetcher(ExchangeBase):
         except FileNotFoundError:
             # Define the initalized state, these are the default values.
             previous_state = {
-                'access_token': None,
-                'refresh_token': None,
-                'access_token_expires_at': 0,
-                'access_token_expires_in': 0,
-                'logged_in': False
+                "access_token": None,
+                "refresh_token": None,
+                "access_token_expires_at": 0,
+                "access_token_expires_in": 0,
+                "logged_in": False,
             }
-        
-        # If the state is initalized.
-        if action == 'init':
 
+        # If the state is initalized.
+        if action == "init":
             # Initalize the state.
             self.state = previous_state
 
             # If they allowed for caching and the file exist, load the file.
-            if self.config['cache_state'] and os.path.isfile(file_path):
+            if self.config["cache_state"] and os.path.isfile(file_path):
                 self.state.update(previous_state)
 
             # If they didnt allow for caching delete the file.
-            elif not self.config['cache_state'] and os.path.isfile(file_path):
+            elif not self.config["cache_state"] and os.path.isfile(file_path):
                 os.remove(file_path)
 
         # if they want to save it and have allowed for caching then load the file.
-        elif action == 'save' and self.config['cache_state']:
+        elif action == "save" and self.config["cache_state"]:
             encrypt_and_write_ts_to_file(file_path, self.state, self.key)
 
     def login(self) -> bool:
@@ -214,11 +217,9 @@ class DataFetcher(ExchangeBase):
         """
 
         # if caching is enabled then attempt silent authentication.
-        if self.config['cache_state']:
-
+        if self.config["cache_state"]:
             # if it was successful, the user is authenticated.
             if self._silent_sso():
-
                 # update the authentication state
                 self.authstate = True
                 return True
@@ -239,7 +240,7 @@ class DataFetcher(ExchangeBase):
 
         # change state to initalized so they will have to either get a
         # new access token or refresh token next time they use the API
-        self._state_manager('init')
+        self._state_manager("init")
 
     def _grab_access_token(self) -> bool:
         """Grabs an access token.
@@ -254,7 +255,7 @@ class DataFetcher(ExchangeBase):
         """
 
         # Parse the URL
-        url_dict = urllib.parse.parse_qs(self.state['redirect_code'])
+        url_dict = urllib.parse.parse_qs(self.state["redirect_code"])
 
         # Convert the values to a list.
         url_values = list(url_dict.values())
@@ -264,19 +265,15 @@ class DataFetcher(ExchangeBase):
 
         # define the parameters of our access token post.
         data = {
-            'grant_type': 'authorization_code',
-            'client_id': self.config['client_id'],
-            'client_secret': self.config['client_secret'],
-            'code': url_code,
-            'redirect_uri': self.config['redirect_uri']
+            "grant_type": "authorization_code",
+            "client_id": self.config["client_id"],
+            "client_secret": self.config["client_secret"],
+            "code": url_code,
+            "redirect_uri": self.config["redirect_uri"],
         }
 
         # Post the data to the token endpoint and store the response.
-        token_response = requests.post(
-            url=self.config['auth_endpoint'],
-            data=data,
-            verify=True
-        )
+        token_response = requests.post(url=self.config["auth_endpoint"], data=data, verify=True)
 
         # Call the `_token_save` method to save the access token.
         if token_response.ok:
@@ -290,7 +287,7 @@ class DataFetcher(ExchangeBase):
         Overview:
         ----
         Attempt a silent authentication, by checking whether current access token
-        is valid and/or attempting to refresh it. Returns True if we have successfully 
+        is valid and/or attempting to refresh it. Returns True if we have successfully
         stored a valid access token.
         Returns:
         ----
@@ -298,11 +295,7 @@ class DataFetcher(ExchangeBase):
         """
 
         # if it's not expired we don't care.
-        if self._token_validation():
-            return True
-
-        # if the current access token is expired then try and refresh access token.
-        elif self.state['refresh_token'] and self._grab_refresh_token():
+        if self._token_validation() or self.state["refresh_token"] and self._grab_refresh_token():
             return True
 
         # More than likely a first time login, so can't do silent authenticaiton.
@@ -318,19 +311,15 @@ class DataFetcher(ExchangeBase):
 
         # Build the parameters of our request.
         data = {
-            'client_id': self.config['client_id'],
-            'client_secret': self.config['client_secret'],
-            'grant_type': 'refresh_token',
-            'response_type': 'token',
-            'refresh_token': self.state['refresh_token']
+            "client_id": self.config["client_id"],
+            "client_secret": self.config["client_secret"],
+            "grant_type": "refresh_token",
+            "response_type": "token",
+            "refresh_token": self.state["refresh_token"],
         }
 
         # Make a post request to the token endpoint.
-        response = requests.post(
-            url=self.config['auth_endpoint'],
-            data=data,
-            verify=True
-        )
+        response = requests.post(url=self.config["auth_endpoint"], data=data, verify=True)
 
         # Save the token if the response was okay.
         if response.ok:
@@ -359,25 +348,24 @@ class DataFetcher(ExchangeBase):
         json_data = response.json()
 
         # Save the access token.
-        if 'access_token' in json_data:
-            self.state['access_token'] = json_data['access_token']
+        if "access_token" in json_data:
+            self.state["access_token"] = json_data["access_token"]
         else:
             self.logout()
             return False
 
         # If there is a refresh token then grab it.
-        if 'refresh_token' in json_data:
-            self.state['refresh_token'] = json_data['refresh_token']
+        if "refresh_token" in json_data:
+            self.state["refresh_token"] = json_data["refresh_token"]
 
         # Set the login state.
-        self.state['logged_in'] = True
+        self.state["logged_in"] = True
 
         # Store token expiration time.
-        self.state['access_token_expires_in'] = json_data['expires_in']
-        self.state['access_token_expires_at'] = time.time() + \
-            int(json_data['expires_in'])
+        self.state["access_token_expires_in"] = json_data["expires_in"]
+        self.state["access_token_expires_at"] = time.time() + int(json_data["expires_in"])
 
-        self._state_manager('save')
+        self._state_manager("save")
 
         return True
 
@@ -394,10 +382,10 @@ class DataFetcher(ExchangeBase):
         """
 
         # Calculate the token expire time.
-        token_exp = time.time() >= self.state['access_token_expires_at']
+        token_exp = time.time() >= self.state["access_token_expires_at"]
 
         # if the time to expiration is less than or equal to 0, return 0.
-        if not self.state['refresh_token'] or token_exp:
+        if not self.state["refresh_token"] or token_exp:
             token_exp = 0
         else:
             token_exp = int(token_exp)
@@ -417,7 +405,7 @@ class DataFetcher(ExchangeBase):
             attempting to get a refresh token.
         """
 
-        if self._token_seconds() < nseconds and self.config['refresh_enabled']:
+        if self._token_seconds() < nseconds and self.config["refresh_enabled"]:
             self._grab_refresh_token()
 
     def _authorize(self) -> None:
@@ -431,33 +419,35 @@ class DataFetcher(ExchangeBase):
 
         # prepare the payload to login
         data = {
-            'response_type': 'code',
-            'client_id': self.config['client_id'],
-            'audience':'https://api.tradestation.com',
-            'redirect_uri': self.config['redirect_uri'],
-            "scope":"MarketData ReadAccount Crypto openid offline_access"
+            "response_type": "code",
+            "client_id": self.config["client_id"],
+            "audience": "https://api.tradestation.com",
+            "redirect_uri": self.config["redirect_uri"],
+            "scope": "MarketData ReadAccount Crypto openid offline_access",
         }
 
         # url encode the data.
         params = urllib.parse.urlencode(data, safe="/:")
         # build the full URL for the authentication endpoint.
-        url = 'https://signin.tradestation.com/authorize?' + params
+        url = "https://signin.tradestation.com/authorize?" + params
 
         # aks the user to go to the URL provided, they will be prompted to authenticate themsevles.
-        print('')
-        print('='*80)
-        print('')
-        print('Please go to URL provided authorize your account: {}'.format(url))
-        print('')
-        print('-'*80)
+        print("")
+        print("=" * 80)
+        print("")
+        print(f"Please go to URL provided authorize your account: {url}")
+        print("")
+        print("-" * 80)
 
         # ask the user to take the final URL after authentication and paste here so we can parse.
-        my_response = input('Paste the full URL redirect here: ')
+        my_response = input("Paste the full URL redirect here: ")
 
         # store the redirect URL
-        self.state['redirect_code'] = my_response
+        self.state["redirect_code"] = my_response
 
-    def _handle_requests(self, url: str, method: str, headers: dict = {}, args: dict = None, stream: bool = False, payload: dict = None) -> dict:
+    def _handle_requests(
+        self, url: str, method: str, headers: dict = {}, args: dict = None, stream: bool = False, payload: dict = None
+    ) -> dict:
         """[summary]
         Arguments:
         ----
@@ -476,51 +466,38 @@ class DataFetcher(ExchangeBase):
         """
 
         streamed_content = []
-        if method == 'get':
-
+        if method == "get":
             # handles the non-streaming GET requests.
             if stream == False:
-                response = requests.get(
-                    url=url, headers=headers, params=args, verify=True)
+                response = requests.get(url=url, headers=headers, params=args, verify=True)
 
             # handles the Streaming request.
             else:
-                response = requests.get(
-                    url=url, headers=headers, params=args, verify=True, stream=True)
+                response = requests.get(url=url, headers=headers, params=args, verify=True, stream=True)
                 for line in response.iter_lines(chunk_size=300):
-
-                    if 'END' not in line.decode() and line.decode() != '':
+                    if "END" not in line.decode() and line.decode() != "":
                         try:
                             streamed_content.append(json.loads(line))
                         except:
                             print(line)
 
-        elif method == 'post':
-
+        elif method == "post":
             if payload is None:
-                response = requests.post(
-                    url=url, headers=headers, params=args, verify=True)
+                response = requests.post(url=url, headers=headers, params=args, verify=True)
             else:
-                response = requests.post(
-                    url=url, headers=headers, params=args, verify=True, json=payload)
+                response = requests.post(url=url, headers=headers, params=args, verify=True, json=payload)
 
-        elif method == 'put':
-
+        elif method == "put":
             if payload is None:
-                response = requests.put(
-                    url=url, headers=headers, params=args, verify=True)
+                response = requests.put(url=url, headers=headers, params=args, verify=True)
             else:
-                response = requests.put(
-                    url=url, headers=headers, params=args, verify=True, json=payload)
+                response = requests.put(url=url, headers=headers, params=args, verify=True, json=payload)
 
-        elif method == 'delete':
-
-            response = requests.delete(
-                url=url, headers=headers, params=args, verify=True)
+        elif method == "delete":
+            response = requests.delete(url=url, headers=headers, params=args, verify=True)
 
         else:
-            raise ValueError(
-                'The type of request you are making is incorrect.')
+            raise ValueError("The type of request you are making is incorrect.")
 
         # grab the status code
         status_code = response.status_code
@@ -529,39 +506,31 @@ class DataFetcher(ExchangeBase):
         response_headers = response.headers
 
         if status_code == 200:
-
-            if response_headers['Content-Type'] in ['application/json', 'charset=utf-8']:
+            if response_headers["Content-Type"] in ["application/json", "charset=utf-8"]:
                 return response.json()
-            elif response_headers['Transfer-Encoding'] == 'chunked':
-
+            elif response_headers["Transfer-Encoding"] == "chunked":
                 return streamed_content
 
         else:
             # Error
-            print('')
-            print('-'*80)
-            print("BAD REQUEST - STATUS CODE: {}".format(status_code))
-            print("RESPONSE URL: {}".format(response.url))
-            print("RESPONSE HEADERS: {}".format(response.headers))
-            print("RESPONSE TEXT: {}".format(response.text))
-            print('-'*80)
-            print('')
-            
-    def user_info(self) -> dict:
+            print("")
+            print("-" * 80)
+            print(f"BAD REQUEST - STATUS CODE: {status_code}")
+            print(f"RESPONSE URL: {response.url}")
+            print(f"RESPONSE HEADERS: {response.headers}")
+            print(f"RESPONSE TEXT: {response.text}")
+            print("-" * 80)
+            print("")
 
+    def user_info(self) -> dict:
         # validate the token.
         self._token_validation()
 
         url = "https://signin.tradestation.com/userinfo"
 
-        response = self._handle_requests(
-                   url=url,
-                   method="get",
-                   headers=self.headers()
-        )
+        response = self._handle_requests(url=url, method="get", headers=self.headers())
 
         return response
-
 
     def get_user_accounts(self) -> dict:
         """Grabs all the accounts associated with the User.
@@ -577,14 +546,10 @@ class DataFetcher(ExchangeBase):
         self._token_validation()
 
         # define the endpoint.
-        url_endpoint = self._api_endpoint(url='brokerage/accounts')
+        url_endpoint = self._api_endpoint(url="brokerage/accounts")
 
         # grab the response.
-        response = self._handle_requests(
-            url=url_endpoint,
-            method='get',
-            headers=self.headers()
-        )
+        response = self._handle_requests(url=url_endpoint, method="get", headers=self.headers())
 
         for dictionnary in response["Accounts"]:
             self.account_meta_data[dictionnary["AccountID"]] = AccountMetaData(
@@ -594,7 +559,7 @@ class DataFetcher(ExchangeBase):
                 Equity=0.0,
                 MarketValue=0.0,
                 TodaysProfitLoss=0.0,
-                UnclearedDeposit=0.0
+                UnclearedDeposit=0.0,
             )
 
         return response
@@ -613,48 +578,32 @@ class DataFetcher(ExchangeBase):
         dict: A list of account balances for each of the accounts.
         """
 
-
         # validate the token.
         self._token_validation()
 
-
         if not self.account_meta_data:
             self.get_user_accounts()
-        
+
         account_keys = [key for key, _ in self.account_meta_data.items()]
 
         # argument validation
         if not account_keys:
-            raise ValueError(
-                "Non existing list")
+            raise ValueError("Non existing list")
         elif len(account_keys) == 0:
-            raise ValueError(
-                "You cannot pass through an empty list for account keys.")
+            raise ValueError("You cannot pass through an empty list for account keys.")
         elif len(account_keys) > 0 and len(account_keys) <= 25:
-            account_keys = ','.join(account_keys)
+            account_keys = ",".join(account_keys)
         elif len(account_keys) > 25:
-            raise ValueError(
-                "You cannot pass through more than 25 account keys.")
+            raise ValueError("You cannot pass through more than 25 account keys.")
 
         # define the endpoint.
-        url_endpoint = self._api_endpoint(
-            url='brokerage/accounts/{account_numbers}/balances'.format(
-                account_numbers=account_keys)
-        )
+        url_endpoint = self._api_endpoint(url=f"brokerage/accounts/{account_keys}/balances")
 
         # define the arguments
-        params = {
-            'access_token': self.state['access_token']
-        }
+        params = {"access_token": self.state["access_token"]}
 
         # grab the response.
-        response = self._handle_requests(
-            url=url_endpoint,
-            method='get',
-            args=params,
-            headers=self.headers()
-        )
-
+        response = self._handle_requests(url=url_endpoint, method="get", args=params, headers=self.headers())
 
         for balance in response["Balances"]:
             self.account_meta_data[balance["AccountID"]].CashBalance = float(balance["CashBalance"])
@@ -679,54 +628,43 @@ class DataFetcher(ExchangeBase):
         dict: update self.account_meta_data but takes into consideration only USD balances
         """
 
-
         # validate the token.
         self._token_validation()
 
-
         if not self.account_meta_data:
             self.get_user_accounts()
-        
-        account_keys = [key for key, _ in self.account_meta_data.items() if self.account_meta_data[key].AccountType == "Crypto"]
+
+        account_keys = [
+            key for key, _ in self.account_meta_data.items() if self.account_meta_data[key].AccountType == "Crypto"
+        ]
 
         # argument validation
         if not account_keys:
-            raise ValueError(
-                "Non existing list")
+            raise ValueError("Non existing list")
         elif len(account_keys) == 0:
-            raise ValueError(
-                "You cannot pass through an empty list for account keys.")
+            raise ValueError("You cannot pass through an empty list for account keys.")
         elif len(account_keys) > 0 and len(account_keys) <= 25:
-            account_keys = ','.join(account_keys)
+            account_keys = ",".join(account_keys)
         elif len(account_keys) > 25:
-            raise ValueError(
-                "You cannot pass through more than 25 account keys.")
+            raise ValueError("You cannot pass through more than 25 account keys.")
 
         # define the endpoint.
-        url_endpoint = self._api_endpoint(
-            url='brokerage/accounts/{account_numbers}/wallets'.format(
-                account_numbers=account_keys)
-        )
+        url_endpoint = self._api_endpoint(url=f"brokerage/accounts/{account_keys}/wallets")
 
         # define the arguments
-        params = {
-            'access_token': self.state['access_token']
-        }
+        params = {"access_token": self.state["access_token"]}
 
         # grab the response.
-        response = self._handle_requests(
-            url=url_endpoint,
-            method='get',
-            args=params,
-            headers=self.headers()
-        )
+        response = self._handle_requests(url=url_endpoint, method="get", args=params, headers=self.headers())
         if response:
             for wallet in response["Wallets"]:
                 if "USD" in wallet["Currency"] == "USDC":
                     self.account_meta_data[wallet["AccountID"]].CashBalance += float(wallet["Balance"])
                     self.account_meta_data[wallet["AccountID"]].Equity += float(wallet["Balance"])
                     self.account_meta_data[wallet["AccountID"]].MarketValue += float(wallet["Balance"])
-                    self.account_meta_data[wallet["AccountID"]].TodaysProfitLoss += float(wallet["UnrealizedProfitLossAccountCurrency"])
+                    self.account_meta_data[wallet["AccountID"]].TodaysProfitLoss += float(
+                        wallet["UnrealizedProfitLossAccountCurrency"]
+                    )
 
         return response
 
@@ -736,15 +674,13 @@ class DataFetcher(ExchangeBase):
         self.account_wallets()
         account_total_balance: float = 0.0
 
-        
         for account_id in self.account_meta_data:
             if self.account_meta_data[account_id].Equity:
                 account_total_balance += self.account_meta_data[account_id].Equity
-                
-        return round(account_total_balance,3)
 
+        return round(account_total_balance, 3)
 
-    def account_positions(self, account_keys: Optional[List[str]] = None, symbols: Optional[List[str]] = None) -> dict:
+    def account_positions(self, account_keys: list[str] | None = None, symbols: list[str] | None = None) -> dict:
         """Grabs all the account positions.
         Arguments:
         ----
@@ -763,88 +699,66 @@ class DataFetcher(ExchangeBase):
 
         if not self.account_meta_data:
             self.get_user_accounts()
-        
+
         if not account_keys:
             account_keys = [key for key, _ in self.account_meta_data.items()]
 
-
         # argument validation, account keys.
         if len(account_keys) == 0:
-            raise ValueError(
-                "You cannot pass through an empty list for account keys.")
+            raise ValueError("You cannot pass through an empty list for account keys.")
         elif len(account_keys) > 0 and len(account_keys) <= 25:
-            account_keys = ','.join(account_keys)
+            account_keys = ",".join(account_keys)
         elif len(account_keys) > 25:
-            raise ValueError(
-                "You cannot pass through more than 25 account keys.")
+            raise ValueError("You cannot pass through more than 25 account keys.")
 
         # argument validation, symbols.
         if symbols is not None:
-
             if len(symbols) == 0:
-                raise ValueError(
-                    "You cannot pass through an empty symbols list for the filter.")
+                raise ValueError("You cannot pass through an empty symbols list for the filter.")
             else:
-
                 symbols_formatted = []
                 for symbol in symbols:
-                    symbols_formatted.append(
-                        "Symbol eq '{}'".format(symbol)
-                    )
+                    symbols_formatted.append(f"Symbol eq '{symbol}'")
 
-                symbols = 'or '.join(symbols_formatted)
-                params = {
-                    'access_token': self.state['access_token'],
-                    '$filter': symbols
-                }
+                symbols = "or ".join(symbols_formatted)
+                params = {"access_token": self.state["access_token"], "$filter": symbols}
 
         else:
-            params = {
-                'access_token': self.state['access_token']
-            }
+            params = {"access_token": self.state["access_token"]}
 
         # define the endpoint.
-        url_endpoint = self._api_endpoint(
-            url='brokerage/accounts/{account_numbers}/positions'.format(
-                account_numbers=account_keys
-            )
-        )
+        url_endpoint = self._api_endpoint(url=f"brokerage/accounts/{account_keys}/positions")
 
         # grab the response.
-        response = self._handle_requests(
-            url=url_endpoint,
-            method='get',
-            args=params,
-            headers=self.headers()
-        )
+        response = self._handle_requests(url=url_endpoint, method="get", args=params, headers=self.headers())
 
         return response
 
     def fetch_positions(self):
-
         positions: dict = self.account_positions()
 
-        data_to_return = {
-            "Symbol": [],
-            "Multiplier": [],
-            "Quantity": [],
-            "Dollar Quantity": []
-        }
+        data_to_return = {"Symbol": [], "Multiplier": [], "Quantity": [], "Dollar Quantity": []}
 
         for position in positions["Positions"]:
             data_to_return["Symbol"].append(position["Symbol"])
-            #extrapolate multiplier
-            multiplier = float(position["MarketValue"]) / abs(int(position["Quantity"])) / ((float(position["Ask"]) + float(position['Bid'])) / 2)
+            # extrapolate multiplier
+            multiplier = (
+                float(position["MarketValue"])
+                / abs(int(position["Quantity"]))
+                / ((float(position["Ask"]) + float(position["Bid"])) / 2)
+            )
             data_to_return["Multiplier"].append(round(multiplier))
             data_to_return["Quantity"].append(int(position["Quantity"]))
-            data_to_return["Dollar Quantity"].append(round(float(position["MarketValue"]),3))
-        
+            data_to_return["Dollar Quantity"].append(round(float(position["MarketValue"]), 3))
+
         return data_to_return
 
 
-if __name__ == '__main__':
-    from account_data_fetcher.launcher.runner import Runner
+if __name__ == "__main__":
     from getpass import getpass
+
+    from account_data_fetcher.launcher.runner import Runner
+
     pwd = getpass("provide password for pk:")
     runner = Runner(pwd)
     current_path = os.path.realpath(os.path.dirname(__file__))

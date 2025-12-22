@@ -20,13 +20,13 @@ This repository allows you to run your finances in the background, freeing you t
 
   - Binance;
   - Bybit;
-  - DYDX; 
-  - Ethereum; 
-  - Interactive Brokers; 
-  - TradeStation;
-  - FTX;
+  - Ethereum;
+  - Hyperliquid;
+  - Interactive Brokers;
   - Kraken;
+  - KuCoin;
   - RootStock;
+  - TradeStation;
 
 </details>
 
@@ -40,57 +40,118 @@ Adding new components is straightforward—simply extend the existing base class
 
 ## Installation
 
-1. **Install virtualenv**:
+### Prerequisites
+- Python 3.11 or higher
+- [Poetry](https://python-poetry.org/docs/#installation) for dependency management
+- Rust (for cryptography library)
+
+### Setup
+
+1. **Install Poetry** (if not already installed):
 ```bash
-sudo pip install virtualenv
+curl -sSL https://install.python-poetry.org | python3 -
 ```
-2. **Clone the repo or a fork of it**
-3. **Navigate to the base repo directory and run**:
+
+2. **Clone the repo or a fork of it**:
 ```bash
-virtualenv env
+git clone https://github.com/SFYLL/enigma_capital.git
+cd enigma_capital
 ```
-4. **Activate your virtual environment**: 
+
+3. **Install dependencies**:
 ```bash
-source env/bin/activate
+poetry install
 ```
-5. **Install the requirements**: 
-```bash
-pip install -r requirements.txt
-```
-6. **Install Rust for the cryptography library**: 
+This creates a virtual environment and installs all required dependencies from `pyproject.toml`.
+
+4. **Install Rust** (for cryptography library):
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
-7. **Generate a Private Key**:   
-Create a private key using `encryptor.py` in `/utilities` (with a password!). The project looks for private keys in both `./account_data_fetcher/secrets/` and `./monitor/` directories. Run the below in both directories to set-up your `./pk.txt`:  
+
+5. **Generate a Private Key**:
+Create a private key using `encryptor.py` in `/utilities` (with a password!). The project looks for private keys in both `./account_data_fetcher/secrets/` and `./monitor/` directories. Run the below in both directories to set up your `./pk.txt`:
 - From `./monitor`:
 ```bash
-python3 ../utilities/encryptor.py
+poetry run python ../utilities/encryptor.py
 ```
-- and from `./account_data_fetcher/secrets/`:
+- From `./account_data_fetcher/secrets/`:
 ```bash
-python3 ../../utilities/encryptor.py
+poetry run python ../../utilities/encryptor.py
 ```
 
-8. **Set API Keys**:  
-Use `encryptor.py` with the function `write_api_key_enc_to_file`, then add additional keys using `add_keys_to_encrypted_file`. Use the following pattern, and source "Other_fields" informations from [here](./account_data_fetcher/secrets/example_.api_enc.py)
+6. **Set API Keys**:
+Use `encryptor.py` with the function `write_api_key_enc_to_file`, then add additional keys using `add_keys_to_encrypted_file`. Use the following pattern, and source "Other_fields" information from [here](./account_data_fetcher/secrets/example_.api_enc.py):
 ```python
 key_information = {
-"Key": "",
-"Secret": "",
-"Other_fields": {}
+    "Key": "",
+    "Secret": "",
+    "Other_fields": {}
 }
 ```
-9. **Create an Encrypted `.gsheet.txt` File**:  
-If using gsheet as write parameters, obtain JSON from Google (cf [tutorial](https://medium.com/craftsmenltd/from-csv-to-google-sheet-using-python-ef097cb014f9))
-10. **Thesis Monitoring Setup**:  
-Repeat steps 6 and 7 in the `/thesis_monitoring` directory.
-11. **Run the Scripts**:   
-You may need to make the script executable first:
+
+7. **Create an Encrypted `.gsheet.txt` File**:
+If using gsheet as write parameters, obtain JSON from Google (see [tutorial](https://medium.com/craftsmenltd/from-csv-to-google-sheet-using-python-ef097cb014f9))
+
+### Running the Application
+
+**Using Poetry run:**
 ```bash
-chmod+x scriptname.sh
+poetry run python -m account_data_fetcher.launcher.runner --log-file ~/log/account_data_fetcher.log --seconds 30 -vvvvvvv -q --exchanges hyperliquid --writers csv
 ```
-Run the scripts. To move them to the background after entering your password, press `CTRL+z`, then run `bg`. `disown` if needed.
+
+**Or activate Poetry shell:**
+```bash
+poetry shell
+python -m account_data_fetcher.launcher.runner --log-file ~/log/account_data_fetcher.log --seconds 30 -vvvvvvv -q --exchanges hyperliquid --writers csv
+```
+
+**Using the convenience scripts:**
+
+Make scripts executable:
+```bash
+chmod +x account_data_fetcher/run.sh
+chmod +x monitor/run_*.sh
+```
+
+Run in foreground:
+```bash
+./account_data_fetcher/run.sh
+```
+
+Run in daemon mode (background):
+```bash
+./account_data_fetcher/run.sh --daemon
+```
+
+To move running processes to background manually: press `CTRL+z`, then run `bg`. Use `disown` if needed.
+
+### Development Commands
+
+**Add a new dependency:**
+```bash
+poetry add package-name
+```
+
+**Run tests:**
+```bash
+poetry run pytest
+```
+
+**Run linter:**
+```bash
+poetry run ruff check .
+```
+
+**Format code:**
+```bash
+poetry run ruff format .
+```
+
+**Update dependencies:**
+```bash
+poetry update
+```
 
 ---
 
@@ -138,13 +199,7 @@ Run TWS or the Gateway manually through the IBKR-provided icon. Navigate to *Hel
 4. **Edit Scripts**:    
 Open the script files and make sure the *TWS_MAJOR_VRSN* variable is set correctly.
 
-5. **Set Environment Variable**:    
-For zsh shells, add *ENIGMA* as an environment variable:
-```
-echo 'export ENIGMA=~/Documents/dev/enigma_capital ' >> ~/.zshenv`
-```     
-    
- 
+
  ## TODOs
 - Take a look at account_data_fetcher, how could you refactor the entire monitor component? ([source](https://github.com/SFYLL/enigma_capital/blob/master/monitor/runner.py#L20))
 - Process request is the only entry-point at the factory level. This could be made more generic to accomodate for other entry-points and inputs as the application scales. ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/launcher/process_factory_base.py#L43))
@@ -157,5 +212,4 @@ echo 'export ENIGMA=~/Documents/dev/enigma_capital ' >> ~/.zshenv`
 - Properly parse the object below so that the inner dataclass can be read as a dataclass, and not accessed as a dict ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/data_aggregator/data_aggregator.py#L323))
 - For now, we only enforce two methods implementation, namely fetch_balance and fetch_positions. As such, process_request is quite statically defined as well. How could we untangle both so that we can define more abstract methods and have the process_request understands what to fetch dynamically. ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/exchanges/exchange_base.py#L12))
 - Fetch positions ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/exchanges/ib_async/data_fetcher.py#L49))
-- Fix arbitrary ConnectionResetError bug requests.exceptions.ConnectionError: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer')) ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/exchanges/dydx/data_fetcher.py#L65))
 - Batch calls via multicall contracts + use helios lightweight client (need to fix eth_call loops, broken atm) ([source](https://github.com/SFYLL/enigma_capital/blob/master/account_data_fetcher/exchanges/ethereum/data_fetcher.py#L42))

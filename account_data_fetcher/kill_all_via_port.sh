@@ -1,7 +1,22 @@
 #!/usr/bin/env zsh
 
-# Hardcoded path to the JSON file
-JSON_PATH="$ENIGMA/account_data_fetcher/config/port_number_pairing.json"
+# Find project root by locating pyproject.toml
+SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+PROJECT_ROOT="$SCRIPT_DIR"
+while [[ "$PROJECT_ROOT" != "/" ]]; do
+    if [[ -f "$PROJECT_ROOT/pyproject.toml" ]]; then
+        break
+    fi
+    PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
+done
+
+if [[ ! -f "$PROJECT_ROOT/pyproject.toml" ]]; then
+    echo "Error: Could not find project root (pyproject.toml not found)"
+    exit 1
+fi
+
+# Path to the JSON file
+JSON_PATH="$PROJECT_ROOT/account_data_fetcher/config/port_number_pairing.json"
 
 kill_process_on_port() {
   local port=$1

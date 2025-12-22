@@ -1,5 +1,4 @@
 .env
-env/
 .DS_Store
 __pycache__/
 .api_enc.txt
@@ -12,3 +11,13 @@ pyrightconfig.json
 !monitor/portfolio_monitor/
 !monitor/*.sh
 !monitor/*.py
+
+# Poetry
+.venv/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Keep poetry.lock committed for reproducible builds
+# poetry.lock

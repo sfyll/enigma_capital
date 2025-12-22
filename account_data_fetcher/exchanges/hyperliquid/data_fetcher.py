@@ -2,16 +2,14 @@ import asyncio
 import json
 import logging
 import os
-from typing import Dict, List, Optional, Tuple
 
 import aiohttp
+from hyperliquid.info import Info
+from hyperliquid.utils import constants
 from web3 import Web3
 
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from infrastructure.api_secret_getter import ApiMetaData
-
-from hyperliquid.info import Info
-from hyperliquid.utils import constants
 
 
 class HyperliquidAPIError(Exception):
@@ -34,13 +32,13 @@ class DataFetcher(ExchangeBase):
             base_url = secrets.other_fields.get("BaseUrl") or secrets.other_fields.get("base_url")
         self._info = Info(base_url or constants.MAINNET_API_URL, skip_ws=True)
 
-    def __get_addresses_of_interest(self) -> List[str]:
+    def __get_addresses_of_interest(self) -> list[str]:
         current_directory = os.path.dirname(__file__)
         path = os.path.abspath(os.path.join(current_directory, "..", "..", "config", "onchain_meta_data.json"))
-        with open(path, "r") as f:
+        with open(path) as f:
             data = json.load(f)
         raw = data.get("addresses_per_chain", {}).get("HYPERLIQUID", [])
-        out: List[str] = []
+        out: list[str] = []
         for a in raw:
             if isinstance(a, str):
                 addr = a.strip()
@@ -50,7 +48,7 @@ class DataFetcher(ExchangeBase):
                     logging.getLogger(__name__).warning(f"Skipping invalid Hyperliquid address: {a}")
         return out
 
-    async def fetch_balance(self, accountType: Optional[str] = None) -> float:
+    async def fetch_balance(self, accountType: str | None = None) -> float:
         loop = asyncio.get_running_loop()
         tasks = [loop.run_in_executor(None, self._info.user_state, addr) for addr in self._addresses]
         try:
@@ -62,7 +60,7 @@ class DataFetcher(ExchangeBase):
             total += self._extract_account_value(s)
         return round(total, 2)
 
-    async def fetch_positions(self, accountType: Optional[str] = None) -> dict:
+    async def fetch_positions(self, accountType: str | None = None) -> dict:
         loop = asyncio.get_running_loop()
         try:
             mids_raw = await loop.run_in_executor(None, self._info.all_mids)
@@ -76,16 +74,16 @@ class DataFetcher(ExchangeBase):
         except Exception as e:
             raise HyperliquidAPIError(f"user_state call failed: {e}") from e
 
-        agg: Dict[str, Tuple[float, float]] = {}
+        agg: dict[str, tuple[float, float]] = {}
         for s in states:
             for sym, qty, notional in self._extract_positions(s, mids):
                 q, n = agg.get(sym, (0.0, 0.0))
                 agg[sym] = (q + qty, n + notional)
 
-        symbols: List[str] = []
-        multipliers: List[int] = []
-        quantities: List[float] = []
-        dollar_quantities: List[float] = []
+        symbols: list[str] = []
+        multipliers: list[int] = []
+        quantities: list[float] = []
+        dollar_quantities: list[float] = []
         for sym, (qty, notional) in agg.items():
             symbols.append(sym)
             multipliers.append(1)
@@ -98,10 +96,10 @@ class DataFetcher(ExchangeBase):
             "Dollar Quantity": dollar_quantities,
         }
 
-    def _mids_dict(self, mids) -> Dict[str, float]:
+    def _mids_dict(self, mids) -> dict[str, float]:
         if isinstance(mids, dict):
             return {str(k).upper(): float(v) for k, v in mids.items() if v is not None}
-        out: Dict[str, float] = {}
+        out: dict[str, float] = {}
         if isinstance(mids, list):
             for item in mids:
                 sym = (item.get("coin") or item.get("symbol") or item.get("asset") or "").upper()
@@ -123,8 +121,8 @@ class DataFetcher(ExchangeBase):
                 return float(v)
         raise HyperliquidAPIError("Could not find account/net liquidation value in user state.")
 
-    def _extract_positions(self, user_state: dict, mids: Dict[str, float]) -> List[tuple]:
-        results: List[tuple] = []
+    def _extract_positions(self, user_state: dict, mids: dict[str, float]) -> list[tuple]:
+        results: list[tuple] = []
         raw_lists = []
         for key in ("assetPositions", "perpPositions", "positions"):
             lst = user_state.get(key)
@@ -137,7 +135,7 @@ class DataFetcher(ExchangeBase):
                 pos = entry.get("position") if isinstance(entry.get("position"), dict) else entry
 
                 # Symbol
-                sym = (pos.get("coin") or pos.get("symbol") or pos.get("asset") or "")
+                sym = pos.get("coin") or pos.get("symbol") or pos.get("asset") or ""
                 if not sym:
                     continue
                 sym = sym.upper()

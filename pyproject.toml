@@ -1,0 +1,79 @@
+[tool.poetry]
+name = "enigma-capital"
+version = "0.1.0"
+description = "Multi-exchange portfolio data aggregation and monitoring system"
+authors = ["Santi <santi@enigmacapital.com>"]
+readme = "README.md"
+packages = [
+    { include = "account_data_fetcher" },
+    { include = "monitor" },
+    { include = "utilities" },
+    { include = "infrastructure" }
+]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.14"
+
+# Core data/async
+aiohttp = "^3.11.11"
+pandas = "^2.2.3"
+
+# HTTP clients
+requests = "^2.32.3"
+
+# Exchange SDKs
+binance-connector = "^3.12.0"
+hyperliquid-python-sdk = "^0.18.0"
+web3 = "^7.7.0"
+ibflex = "^0.15"
+
+# Output/monitoring
+gspread = "^6.1.4"
+oauth2client = "^4.1.3"
+python-telegram-bot = "^21.10"
+tabulate = "^0.9.0"
+matplotlib = "^3.10.0"
+
+# Crypto/security
+PGPy = "^0.6.0"
+
+# Utilities
+setproctitle = "^1.3.4"
+holidays = "^0.79"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.8.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.24.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501", # line too long (handled by formatter)
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"

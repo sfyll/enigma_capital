@@ -1,7 +1,5 @@
 import dataclasses
-from getpass import getpass
 import json
-from typing import Dict, Optional
 
 import utilities.encryptor as encryptor
 
@@ -10,15 +8,16 @@ import utilities.encryptor as encryptor
 class ApiMetaData:
     """
     Dataclass for storing API metadata.
-    
+
     Attributes:
         key (str): API key.
         secret (str): API secret.
         other_fields (Optional[dict]): Optional dictionary to store additional fields.
     """
+
     key: str
     secret: str
-    other_fields: Optional[dict]
+    other_fields: dict | None
 
 
 class ApiSecretGetter:
@@ -29,8 +28,9 @@ class ApiSecretGetter:
     given files using a provided password. Supports retrieval
     of API metadata for generic APIs and Google Sheets.
     """
+
     def __init__(self):
-        pass    
+        pass
 
     @staticmethod
     def get_api_meta_data(path: str, pwd: str) -> ApiMetaData:
@@ -54,13 +54,13 @@ class ApiSecretGetter:
         except FileNotFoundError or NotADirectoryError as e:
             raise e
         with key.unlock(pwd):
-            meta_data: str = encryptor.pgpy_decrypt(key, encrypted_meta_data).replace('\'', '\"')
-            meta_data_dict: dict =  json.loads(meta_data)
+            meta_data: str = encryptor.pgpy_decrypt(key, encrypted_meta_data).replace("'", '"')
+            meta_data_dict: dict = json.loads(meta_data)
             for key in meta_data_dict:
                 api_meta_data[key] = ApiMetaData(
                     key=meta_data_dict[key]["Key"],
                     secret=meta_data_dict[key]["Secret"],
-                    other_fields=meta_data_dict[key]["Other_fields"] if "Other_fields" in meta_data_dict[key] else None
+                    other_fields=meta_data_dict[key]["Other_fields"] if "Other_fields" in meta_data_dict[key] else None,
                 )
         return api_meta_data
 
@@ -88,8 +88,5 @@ class ApiSecretGetter:
         except FileNotFoundError or NotADirectoryError as e:
             raise e
         with key.unlock(pwd):
-            meta_data: str = encryptor.pgpy_decrypt(key, encrypted_meta_data).replace('\'', '\"')
-            return ApiMetaData(
-                key="",
-                secret="",
-                other_fields=json.loads(meta_data))
+            meta_data: str = encryptor.pgpy_decrypt(key, encrypted_meta_data).replace("'", '"')
+            return ApiMetaData(key="", secret="", other_fields=json.loads(meta_data))

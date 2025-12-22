@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 find_project_root() {
     local dir="$1"
     while [ "$dir" != "/" ]; do
-        if [ -d "$dir/env" ]; then
+        if [ -f "$dir/pyproject.toml" ]; then
             echo "$dir"
             return
         fi
@@ -20,30 +20,15 @@ find_project_root() {
 PROJECT_ROOT=$(find_project_root "$SCRIPT_DIR")
 
 if [ -z "$PROJECT_ROOT" ]; then
-    echo "Project root not found. Please ensure the virtual environment is properly set up."
+    echo "Project root not found. Please ensure pyproject.toml exists."
     exit 1
 fi
-
-# Define the virtual environment directory
-VENV_DIR="$PROJECT_ROOT/env"
-
-# Check if the virtual environment exists
-if [ ! -d "$VENV_DIR" ]; then
-    echo "Virtual environment not found in $VENV_DIR. Please set it up first."
-    exit 1
-fi
-
-# Activate the virtual environment
-source "$VENV_DIR/bin/activate"
 
 # Navigate to the portfolio_monitor directory if not already there
 if [ "$(pwd)" != "$PROJECT_ROOT/monitor/portfolio_monitor" ]; then
     cd "$PROJECT_ROOT/monitor/portfolio_monitor" || exit
 fi
 
-# Run the Python script
-python3 returns_study.py "$@"
-
-# Deactivate the virtual environment
-deactivate
+# Run the Python script using Poetry
+cd "$PROJECT_ROOT" && poetry run python monitor/portfolio_monitor/returns_study.py "$@"
 

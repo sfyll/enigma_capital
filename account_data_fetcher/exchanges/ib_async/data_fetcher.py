@@ -1,9 +1,7 @@
-import logging
-from typing import Optional
-
 from ib_insync import *
 
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
+
 
 class DataFetcher(ExchangeBase):
     __EXCHANGE = "IB"
@@ -11,12 +9,13 @@ class DataFetcher(ExchangeBase):
     __GATEWAY_PORT = 4001
     __TWS_PORT = 7496
     __HOST = "127.0.0.1"
+
     def __init__(self, port_number: int, app: str = "GATEWAY"):
         super().__init__(port_number, self.__EXCHANGE)
         self.__on_start(app)
-        self.netliq: Optional[float] = None
+        self.netliq: float | None = None
 
-    def __on_start(self, app : str) -> None:
+    def __on_start(self, app: str) -> None:
         if app == "TWS":
             self.__initialize_client_and_watchdog(self.__GATEWAY_V, False, self.__HOST, self.__TWS_PORT)
         elif app == "GATEWAY":
@@ -26,9 +25,15 @@ class DataFetcher(ExchangeBase):
         self.watchdog.start()
         self.ib.run()
 
-    def __initialize_client_and_watchdog(self, gateway_v: str, is_gateway:bool, host: str, port: int) -> None:
-        ibc = IBC(gateway_v, gateway=is_gateway, tradingMode='live', userid=self.api_meta_data[self.__EXCHANGE].key,
-                        password=self.api_meta_data[self.__EXCHANGE].secret, ibcIni="/opt/ibc/config.ini")
+    def __initialize_client_and_watchdog(self, gateway_v: str, is_gateway: bool, host: str, port: int) -> None:
+        ibc = IBC(
+            gateway_v,
+            gateway=is_gateway,
+            tradingMode="live",
+            userid=self.api_meta_data[self.__EXCHANGE].key,
+            password=self.api_meta_data[self.__EXCHANGE].secret,
+            ibcIni="/opt/ibc/config.ini",
+        )
         self.ib = IB()
         self.ib.accountValueEvent += self.__account_value_event
         self.watchdog = Watchdog(ibc, self.ib, host, port, readonly=True)
@@ -45,15 +50,14 @@ class DataFetcher(ExchangeBase):
             self.ib.sleep(1)
         else:
             return self.netliq
-        
-    #TODO: Fetch positions
-    def fetch_positions(self) -> float:
-        ...
+
+    # TODO: Fetch positions
+    def fetch_positions(self) -> float: ...
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     import os
+
     path = os.path.realpath(os.path.dirname(__file__))
     pwd = ""
     executor = InteractiveBrokersAppAsync(path, pwd, app="GATEWAY")
