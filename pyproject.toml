@@ -25,7 +25,8 @@ requests = "^2.32.3"
 binance-connector = "^3.12.0"
 hyperliquid-python-sdk = "^0.18.0"
 web3 = "^7.7.0"
-ibflex = "^0.15"
+ibflex = { git = "https://github.com/csingley/ibflex.git", tag = "0.16" }
+
 
 # Output/monitoring
 gspread = "^6.1.4"

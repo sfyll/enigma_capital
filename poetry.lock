@@ -1711,17 +1711,22 @@ websocket-client = ">=1.5.1,<2.0.0"
 
 [[package]]
 name = "ibflex"
-version = "0.15"
+version = "0.16"
 description = "('Parse Interactive Brokers Flex XML reports and convert to Python types',)"
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
-files = [
-    {file = "ibflex-0.15.tar.gz", hash = "sha256:e1ab295ff8d615f1279287d6214752110c7faa9493fcffd7c5519e718d3004a7"},
-]
+files = []
+develop = false
 
 [package.extras]
 web = ["requests"]
+
+[package.source]
+type = "git"
+url = "https://github.com/csingley/ibflex.git"
+reference = "0.16"
+resolved_reference = "66a363bedc2ee02e43c5f1adb23efbdcd748fd1d"
 
 [[package]]
 name = "idna"
@@ -3828,4 +3833,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.14"
-content-hash = "5d3b41268669173557452ba5e6ad5ef306f1312f2ffda53b96715b8f29cda38b"
+content-hash = "460a30e792de947e926c9e38dccfdee404cb5ac9dcc27a3748c5f1cc055b00c6"
