@@ -1,5 +1,7 @@
 import os
 
+import aiohttp
+
 from account_data_fetcher.exchanges.exchange_base import ExchangeBase
 from account_data_fetcher.exchanges.kucoin.exception import InvalidRequestError
 from account_data_fetcher.exchanges.kucoin.kucoin_connector import kucoinApiConnector
@@ -11,8 +13,10 @@ class DataFetcher(ExchangeBase):
     _EXCHANGE = "KUCOIN"
     _ENDPOINT = "https://api.kucoin.com"
 
-    def __init__(self, secrets: ApiMetaData, port_number: int, sub_account_name: str | None = None) -> None:
-        super().__init__(port_number, self._EXCHANGE)
+    def __init__(
+        self, secrets: ApiMetaData, session: aiohttp.ClientSession, sub_account_name: str | None = None
+    ) -> None:
+        super().__init__(exchange=self._EXCHANGE, session=session)
         self._subaccount_name = sub_account_name
         self.kucoin_connector = kucoinApiConnector(
             api_key=secrets.key, api_secret=secrets.secret, passphrase=secrets.other_fields["Passphrase"]
