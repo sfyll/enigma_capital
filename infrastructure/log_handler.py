@@ -1,3 +1,4 @@
+import ast
 import logging.config
 import os
 from configparser import ConfigParser
@@ -8,6 +9,13 @@ def get_base_path():
     """Returns the absolute path to the project's root directory."""
     current_directory = os.path.dirname(__file__)
     return os.path.abspath(os.path.join(current_directory, ".."))
+
+def _normalize_log_path(path: str) -> str:
+    path = os.path.expanduser(path)
+    if not os.path.isabs(path):
+        path = os.path.abspath(os.path.join(get_base_path(), path))
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    return path
 
 
 def logging_handler(args):
@@ -27,19 +35,20 @@ def logging_handler(args):
     config_path = os.path.join(get_base_path(), "account_data_fetcher/config/logging_config.ini")
 
     config = ConfigParser()
-    read_files = config.read(config_path)
-    config_exists = os.path.exists(config_path)
-    config_size = os.path.getsize(config_path) if config_exists else 0
-    print(f"[log_handler] config_path={config_path}")
-    print(f"[log_handler] read_files={read_files}")
-    print(f"[log_handler] exists={config_exists} size={config_size}")
-    print(f"[log_handler] sections={config.sections()}")
-    print(f"[log_handler] has_formatters={'formatters' in config}")
+    config.read(config_path)
 
     if "handler_fileHandler" in config:
         if args.log_file:
-            # Use tuple-like syntax for the 'args' value
-            config["handler_fileHandler"]["args"] = f"('{args.log_file}',)"
+            log_path = _normalize_log_path(args.log_file)
+            config["handler_fileHandler"]["args"] = f"('{log_path}',)"
+        elif "args" in config["handler_fileHandler"]:
+            try:
+                handler_args = ast.literal_eval(config["handler_fileHandler"]["args"])
+                if isinstance(handler_args, tuple) and handler_args:
+                    log_path = _normalize_log_path(str(handler_args[0]))
+                    config["handler_fileHandler"]["args"] = f"('{log_path}',)"
+            except (ValueError, SyntaxError):
+                pass
 
     if "logger_root" in config:
         config["logger_root"]["level"] = log_level_name
@@ -47,8 +56,6 @@ def logging_handler(args):
     config_buffer = StringIO()
     config.write(config_buffer)
     config_buffer.seek(0)  # Rewind the buffer to the beginning
-    buffer_value = config_buffer.getvalue()
-    print(f"[log_handler] buffer_len={len(buffer_value)}")
     logging.config.fileConfig(config_buffer)
 
     return args
