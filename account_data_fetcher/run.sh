@@ -26,4 +26,4 @@ fi
 
 cd "$PROJECT_ROOT"
 
-poetry run python -m account_data_fetcher.launcher.runner --log-file ~/log/account_data_fetcher.log --seconds 30 -vvvvvvv -q --exchanges hyperliquid --writers csv 
+poetry run python -m account_data_fetcher.launcher.runner --log-file ~/log/account_data_fetcher.log --seconds 86400 -v -q --exchanges Binance Ethereum IB_flex Kraken KUCOIN hyperliquid --writers csv gsheet 
