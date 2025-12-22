@@ -1,6 +1,6 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
-# Determine the script's directory (shell-agnostic)
+# Determine the script's directory (works in bash, zsh if explicitly invoked)
 if [ -n "$BASH_VERSION" ]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 elif [ -n "$ZSH_VERSION" ]; then
