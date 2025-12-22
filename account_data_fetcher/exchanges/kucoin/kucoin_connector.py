@@ -136,6 +136,7 @@ class kucoinApiConnector:
                     )
 
             if response["code"] != "200000":
+                print(f"[kucoin] error response: {response}")
                 # Generate error message.
                 error_msg = f'{response["retMsg"]} (ErrCode: {response["retCode"]})'
 
