@@ -47,29 +47,100 @@ Adding new components is straightforward—simply extend the existing base class
 
 ### Setup
 
-1. **Install Poetry** (if not already installed):
+#### 1. Install Python 3.11+ (if needed)
+
+Check your Python version:
+```bash
+python3 --version
+```
+
+If you have Python 3.11+, skip to step 2. Otherwise, install using **pyenv** (recommended):
+
+**Install pyenv:**
+```bash
+# On macOS
+brew install pyenv
+
+# On Ubuntu/Debian
+curl https://pyenv.run | bash
+
+# On other Linux distros, see: https://github.com/pyenv/pyenv#installation
+```
+
+**Add pyenv to your shell** (add to `~/.bashrc`, `~/.zshrc`, or equivalent):
+```bash
+export PATH="$HOME/.pyenv/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+```
+
+Then reload your shell:
+```bash
+source ~/.bashrc  # or source ~/.zshrc
+```
+
+**Install Python 3.11+:**
+```bash
+pyenv install 3.11.9
+pyenv global 3.11.9  # Set as default, or use 'pyenv local 3.11.9' for project-only
+```
+
+Verify:
+```bash
+python --version  # Should show 3.11.9 or higher
+```
+
+#### 2. Install Poetry
+
 ```bash
 curl -sSL https://install.python-poetry.org | python3 -
 ```
 
-2. **Clone the repo or a fork of it**:
+**Add Poetry to PATH:**
+
+The installer will tell you where Poetry was installed (usually `~/.local/bin`). Add it to your PATH:
+
+```bash
+# For bash users
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# For zsh users
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Verify Poetry is installed:
+```bash
+poetry --version
+```
+
+#### 3. Clone the Repository
+
 ```bash
 git clone https://github.com/SFYLL/enigma_capital.git
 cd enigma_capital
 ```
 
-3. **Install dependencies**:
+#### 4. Install Dependencies
+
 ```bash
 poetry install
 ```
-This creates a virtual environment and installs all required dependencies from `pyproject.toml`.
 
-4. **Install Rust** (for cryptography library):
+This creates a `.venv` virtual environment and installs all required dependencies from `pyproject.toml`.
+
+#### 5. Install Rust (for cryptography library)
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-5. **Generate a Private Key**:
+After installation, restart your terminal or run:
+```bash
+source $HOME/.cargo/env
+```
+
+#### 6. Generate a Private Key
 Create a private key using `encryptor.py` in `/utilities` (with a password!). The project looks for private keys in both `./account_data_fetcher/secrets/` and `./monitor/` directories. Run the below in both directories to set up your `./pk.txt`:
 - From `./monitor`:
 ```bash
@@ -80,7 +151,7 @@ poetry run python ../utilities/encryptor.py
 poetry run python ../../utilities/encryptor.py
 ```
 
-6. **Set API Keys**:
+#### 7. Set API Keys
 Use `encryptor.py` with the function `write_api_key_enc_to_file`, then add additional keys using `add_keys_to_encrypted_file`. Use the following pattern, and source "Other_fields" information from [here](./account_data_fetcher/secrets/example_.api_enc.py):
 ```python
 key_information = {
@@ -90,7 +161,7 @@ key_information = {
 }
 ```
 
-7. **Create an Encrypted `.gsheet.txt` File**:
+#### 8. Create an Encrypted `.gsheet.txt` File (Optional)
 If using gsheet as write parameters, obtain JSON from Google (see [tutorial](https://medium.com/craftsmenltd/from-csv-to-google-sheet-using-python-ef097cb014f9))
 
 ### Running the Application
