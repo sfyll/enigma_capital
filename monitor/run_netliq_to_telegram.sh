@@ -34,4 +34,4 @@ fi
 
 cd "$PROJECT_ROOT"
 
-poetry run python -m monitor.runner --log-file ~/log/netliq_to_telegram.log --seconds 5 --request-type NETLIQ -vvvvv 
+poetry run python -m monitor.runner --log-file ~/log/netliq_to_telegram.log --seconds 3600 --request-type NETLIQ -v -q 
