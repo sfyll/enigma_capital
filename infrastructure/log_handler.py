@@ -27,7 +27,14 @@ def logging_handler(args):
     config_path = os.path.join(get_base_path(), "account_data_fetcher/config/logging_config.ini")
 
     config = ConfigParser()
-    config.read(config_path)
+    read_files = config.read(config_path)
+    config_exists = os.path.exists(config_path)
+    config_size = os.path.getsize(config_path) if config_exists else 0
+    print(f"[log_handler] config_path={config_path}")
+    print(f"[log_handler] read_files={read_files}")
+    print(f"[log_handler] exists={config_exists} size={config_size}")
+    print(f"[log_handler] sections={config.sections()}")
+    print(f"[log_handler] has_formatters={'formatters' in config}")
 
     if "handler_fileHandler" in config:
         if args.log_file:
@@ -40,7 +47,8 @@ def logging_handler(args):
     config_buffer = StringIO()
     config.write(config_buffer)
     config_buffer.seek(0)  # Rewind the buffer to the beginning
-    print(config_buffer.getvalue())
+    buffer_value = config_buffer.getvalue()
+    print(f"[log_handler] buffer_len={len(buffer_value)}")
     logging.config.fileConfig(config_buffer)
 
     return args
