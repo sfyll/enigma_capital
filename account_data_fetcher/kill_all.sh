@@ -25,5 +25,5 @@ fi
 
 cd "$PROJECT_ROOT"
 
-pkill account_data_fetcher
+pkill -f account_data_fetcher
 echo "Termination signal sent."
