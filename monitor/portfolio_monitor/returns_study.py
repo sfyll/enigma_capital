@@ -19,9 +19,12 @@ class returnStudy:
             base + "/account_data_fetcher/csv_db/deposits_and_withdraws.csv",
         )
 
-    def construct_twr(self, start_date: str = "01/01/2023", exchange: str | None = None):
+    def construct_twr(self, start_date: str | None = None, end_date: str | None = None, exchange: str | None = None):
         self.row_cache = pd.DataFrame()
-        start_date = datetime.strptime(start_date, "%d/%m/%Y")
+        if start_date is not None:
+            start_date = datetime.strptime(start_date, "%d/%m/%Y")
+        if end_date is not None:
+            end_date = datetime.strptime(end_date, "%d/%m/%Y")
 
         netliq_data = pd.read_csv(self.netliq_path)
         netliq_data["date"] = pd.to_datetime(netliq_data["date"])
@@ -41,7 +44,10 @@ class returnStudy:
             netliq_data[["netliq"]], net_transactions, left_index=True, right_index=True, how="left", sort=True
         )
 
-        merged_data = merged_data[netliq_data.index >= start_date]
+        if start_date is not None:
+            merged_data = merged_data[netliq_data.index >= start_date]
+        if end_date is not None:
+            merged_data = merged_data[netliq_data.index <= end_date]
         merged_data.fillna(0, inplace=True)
 
         if exchange is not None:
@@ -146,8 +152,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--start-date",
         type=str,
-        default="01/01/2024",
-        help="The start date for the TWR calculation in the format DD/MM/YYYY. Defaults to 01/01/2024.",
+        default=None,
+        help="Start date for the TWR calculation in DD/MM/YYYY. Defaults to earliest available date.",
+    )
+    parser.add_argument(
+        "--end-date",
+        type=str,
+        default=None,
+        help="End date for the TWR calculation in DD/MM/YYYY. Defaults to latest available date.",
     )
     args = parser.parse_args()
     executor = returnStudy()
@@ -157,12 +169,28 @@ if __name__ == "__main__":
     if os.path.exists(os.path.join(executor.base_path, daily_statistics_path)):
         print("Loading existing daily statistics...")
         daily_twr_data = executor.load_csv(daily_statistics_path)
-        # Check if the loaded data includes the requested start date
-        if daily_twr_data.index.min() < pd.to_datetime(args.start_date, format="%d/%m/%Y"):
-            daily_twr_data = executor.construct_twr(start_date=args.start_date, exchange=None)
+        # Recompute if cached data doesn't cover requested range
+        if args.start_date and daily_twr_data.index.min() > pd.to_datetime(args.start_date, format="%d/%m/%Y"):
+            daily_twr_data = executor.construct_twr(
+                start_date=args.start_date, end_date=args.end_date, exchange=None
+            )
+        elif args.end_date and daily_twr_data.index.max() < pd.to_datetime(args.end_date, format="%d/%m/%Y"):
+            daily_twr_data = executor.construct_twr(
+                start_date=args.start_date, end_date=args.end_date, exchange=None
+            )
     else:
-        print(f"Daily statistics file not found. Constructing data from {args.start_date}...")
-        daily_twr_data = executor.construct_twr(start_date=args.start_date, exchange=None)
+        print("Daily statistics file not found. Constructing data from requested range...")
+        daily_twr_data = executor.construct_twr(start_date=args.start_date, end_date=args.end_date, exchange=None)
+
+    if args.start_date:
+        start_dt = pd.to_datetime(args.start_date, format="%d/%m/%Y")
+        daily_twr_data = daily_twr_data[daily_twr_data.index >= start_dt]
+    if args.end_date:
+        end_dt = pd.to_datetime(args.end_date, format="%d/%m/%Y")
+        daily_twr_data = daily_twr_data[daily_twr_data.index <= end_dt]
+
+    if not daily_twr_data.empty:
+        daily_twr_data["daily_twr"] = daily_twr_data["daily_twr"] - daily_twr_data["daily_twr"].iloc[0]
 
     executor.save_to_csv(daily_twr_data, daily_statistics_path)
 

@@ -33,6 +33,7 @@ class Portfolio:
         self.investors = {}
         self.total_units = 0.0
         self.nav_history = pd.DataFrame(columns=["date", "nav"])
+        self.pending_internal_transfers: list[str] = []
 
     def add_investor(self, investor_name):
         investor_name = investor_name.lower()
@@ -42,6 +43,7 @@ class Portfolio:
             print(f"[Add Investor] New investor added: {investor_name}")
 
     def process(self):
+        self.audit_internal_transfers()
         all_dates = (
             pd.concat([self.netliq_data["date"], self.cash_flow_data["date"]])
             .drop_duplicates()
@@ -117,6 +119,48 @@ class Portfolio:
 
                 self.total_units += units
                 print(f"[Total Units Update] {date.strftime('%Y-%m-%d')}: Total Units = {self.total_units}")
+
+    def audit_internal_transfers(self) -> None:
+        if "type" not in self.cash_flow_data.columns:
+            return
+
+        internal = self.cash_flow_data[self.cash_flow_data["type"].str.upper() == "INTERNAL_TRANSFER"].copy()
+        if internal.empty:
+            return
+
+        internal["trade_id"] = internal.get("trade_id", "").fillna("").astype(str).str.strip()
+        internal["from_exchange"] = internal.get("from_exchange", "").fillna("").astype(str).str.strip()
+        internal["to_exchange"] = internal.get("to_exchange", "").fillna("").astype(str).str.strip()
+
+        no_id = internal[internal["trade_id"] == ""]
+        missing_exchange = no_id[(no_id["from_exchange"] == "") | (no_id["to_exchange"] == "")]
+        for _, row in missing_exchange.iterrows():
+            print(
+                f"[Internal Transfer Warning] Missing exchange fields on {row['date']}: "
+                f"from='{row['from_exchange']}', to='{row['to_exchange']}'"
+            )
+
+        with_id = internal[internal["trade_id"] != ""]
+        if with_id.empty:
+            return
+
+        for trade_id, group in with_id.groupby("trade_id"):
+            if len(group) < 2:
+                self.pending_internal_transfers.append(trade_id)
+                print(
+                    f"[Internal Transfer Pending] trade_id='{trade_id}' only has one leg "
+                    f"({group.iloc[0]['date']})."
+                )
+                continue
+            if len(group) > 2:
+                print(
+                    f"[Internal Transfer Warning] trade_id='{trade_id}' has {len(group)} legs; "
+                    "expected exactly 2."
+                )
+            dates = pd.to_datetime(group["date"], dayfirst=True, errors="coerce").dropna().unique()
+            if len(dates) > 1:
+                date_list = ", ".join(sorted(d.strftime("%Y-%m-%d") for d in dates))
+                print(f"[Internal Transfer Multi-day] trade_id='{trade_id}' spans: {date_list}")
 
     def calculate_shares(self):
         unit_histories = []
@@ -291,9 +335,14 @@ class Portfolio:
 
     def print_current_pnl(self):
         latest_data = self.shares_df.iloc[-1]
+        total_fund_value = latest_data["total_units"] * latest_data["nav"]
+        print(f"Fund Total Value: {total_fund_value:.2f}")
         for investor in self.investors.keys():
             investment_value = latest_data[f"{investor}_investment_value"]
             print(f"{investor.capitalize()}'s Investment Value: {investment_value:.2f}")
+            share_col = f"{investor}_share"
+            if share_col in latest_data:
+                print(f"{investor.capitalize()}'s Share: {latest_data[share_col]:.4f}")
 
 
 def main():
