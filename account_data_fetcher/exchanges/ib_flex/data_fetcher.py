@@ -89,7 +89,7 @@ class DataFetcher(ExchangeBase):
         today_et_date = datetime.now(self._tz_et).date()
         expected_lbd = self._last_business_day(today_et_date)
 
-        is_data_current = data_date == today_et_date
+        is_data_current = data_date == expected_lbd
 
         report_generated_utc = self._to_utc_from_eastern(balance_statement.whenGenerated)
 
