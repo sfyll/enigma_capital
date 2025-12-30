@@ -15,6 +15,7 @@ from utilities.request_handler import requestHandler
 
 class kucoinApiConnector:
     __ENDPOINT = "https://api.kucoin.com"
+    __TIME_ENDPOINT = "api/v1/timestamp"
 
     def __init__(
         self,
@@ -37,6 +38,10 @@ class kucoinApiConnector:
         self.max_retries: int = max_retries
         self.force_retry: bool = force_retry
         self.retry_delay: int = retry_delay
+        self._time_offset_ms: int = 0  # server - local
+        self._last_time_sync_ms: int = 0
+        self._time_sync_interval_ms: int = 5 * 60_000
+        self._sync_time_with_kucoin()
 
         # Set whitelist of non-fatal Bybit status codes to retry on.
         if retry_codes is None:
@@ -76,7 +81,32 @@ class kucoinApiConnector:
         }
 
     def __get_utc_timestamp_milliseconds(self) -> str:
-        return str(int(time.time() * 10**3))
+        return str(self._timestamp_ms())
+
+    def _now_ms(self) -> int:
+        return int(time.time() * 1000)
+
+    def _sync_time_with_kucoin(self) -> None:
+        try:
+            url = self.__request_handler.endpoint_extension(self.__ENDPOINT, self.__TIME_ENDPOINT)
+            response = self.__request_handler.handle_requests(url=url, method="get", args={}, raw_response=False)
+            if response.get("code") == "200000":
+                server_time = int(response["data"])
+                local = self._now_ms()
+                self._time_offset_ms = server_time - local
+                self._last_time_sync_ms = local
+                self.logger.info(f"KuCoin time offset set to {self._time_offset_ms} ms")
+        except Exception as e:
+            self.logger.warning(f"Could not sync KuCoin server time: {e}")
+
+    def _timestamp_ms(self) -> int:
+        now = self._now_ms()
+        if now - self._last_time_sync_ms > self._time_sync_interval_ms:
+            try:
+                self._sync_time_with_kucoin()
+            except Exception:
+                pass
+        return now + self._time_offset_ms
 
     def __sign(self, timestamp: str, params: dict, method: str, path: str) -> bytes:
         _val = "&".join([str(k) + "=" + str(v) for k, v in sorted(params.items()) if (k != "sign") and (v is not None)])
@@ -137,14 +167,20 @@ class kucoinApiConnector:
 
             if response["code"] != "200000":
                 print(f"[kucoin] error response: {response}")
-                # Generate error message.
-                error_msg = f'{response["retMsg"]} (ErrCode: {response["retCode"]})'
+                code = response.get("code")
+                msg = response.get("msg") or response.get("message") or "Unknown KuCoin error"
+                error_msg = f"{msg} (ErrCode: {code})"
+
+                if code == "400002":
+                    self.logger.warning("KuCoin timestamp invalid. Resyncing time and retrying once.")
+                    self._sync_time_with_kucoin()
+                    continue
 
                 # Retry non-fatal whitelisted error requests.
-                if response["retCode"] in self.retry_codes:
+                if response.get("retCode") in self.retry_codes:
                     # 10006, ratelimit error; wait until rate_limit_reset_ms
                     # and retry.
-                    if response["retCode"] == 10006:
+                    if response.get("retCode") == 10006:
                         self.logger.error(
                             f"{error_msg}. Ratelimited on current request. "
                             f"Sleeping, then trying again. Request: {path}"
@@ -159,8 +195,8 @@ class kucoinApiConnector:
                 else:
                     raise InvalidRequestError(
                         request=f"{method} {path}: {req_params}",
-                        message=response["retMsg"],
-                        status_code=response["retCode"],
+                        message=msg,
+                        status_code=code,
                         time=dt.utcnow().strftime("%H:%M:%S"),
                     )
             else:
