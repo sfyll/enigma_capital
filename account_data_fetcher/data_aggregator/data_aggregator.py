@@ -163,7 +163,6 @@ class AggregatedData:
         if last_sent_date == utc_today:
             return False
 
-        # Now, verify the data from all exchanges.
         for ex_name, ex_data in self.exchanges.items():
             if not ex_data.report_timestamp_utc:
                 self.logger.debug(f"Cannot send daily report: Exchange '{ex_name}' is missing a report timestamp.")

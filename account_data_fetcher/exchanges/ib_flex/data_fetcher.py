@@ -43,6 +43,7 @@ class DataFetcher(ExchangeBase):
 
         self._tz_et = ZoneInfo("America/New_York")
         self._tz_utc = ZoneInfo("UTC")
+        self._tz_cet = ZoneInfo("Europe/Paris")
 
         self._us_holidays = None
         try:
@@ -86,11 +87,8 @@ class DataFetcher(ExchangeBase):
 
         data_date = balance_statement.toDate
 
-        today_et_date = datetime.now(self._tz_et).date()
-        expected_lbd = self._last_business_day(today_et_date)
-
-        is_data_current = data_date == expected_lbd
-
+        expected_prior_bd_cet = self._prior_business_day_cet()
+        is_data_current = data_date == expected_prior_bd_cet
         report_generated_utc = self._to_utc_from_eastern(balance_statement.whenGenerated)
 
         balance_value = round(float(balance_statement.ChangeInNAV.endingValue), 3)
@@ -106,7 +104,7 @@ class DataFetcher(ExchangeBase):
             )
 
         self.logger.info(
-            f"IB Flex: data_date={data_date} (expected LBD={expected_lbd}, current={is_data_current}); "
+            f"IB Flex: data_date={data_date} (expected prior BD CET={expected_prior_bd_cet}, current={is_data_current}); "
             f"generated_utc={report_generated_utc}."
         )
 
@@ -114,7 +112,7 @@ class DataFetcher(ExchangeBase):
             "exchange": self._EXCHANGE,
             "balance": balance_value,
             "positions": positions_data,
-            "report_timestamp_utc": report_generated_utc if is_data_current else None,
+            "report_timestamp_utc": datetime.utcnow() if is_data_current else None,
         }
 
     async def _fetch_report_async(self, query_id: str) -> FlexQueryResponse:
@@ -162,10 +160,29 @@ class DataFetcher(ExchangeBase):
             return False
         return True
 
-    def _last_business_day(self, today_utc) -> datetime.date:
-        # Returns the most recent ET date that is a business day strictly before 'today_utc'
-        d = today_utc - timedelta(days=1)
+    def _last_business_day(self, reference_date) -> datetime.date:
+        # IB Flex updates data between 5-7am CET (roughly midnight-2am ET)
+        # After the cutoff time, if today is a business day, expect today's data
+        # Otherwise, expect the last business day before today
+        now_et = datetime.now(self._tz_et)
+
+        # Use 2am ET as cutoff (covers 7am CET in winter / 8am CET in summer due to DST differences)
+        cutoff_hour = 2
+
+        # If past cutoff AND today is a business day, expect today's data
+        if now_et.hour >= cutoff_hour and self._is_business_day_et(reference_date):
+            return reference_date
+
+        # Otherwise, find the last business day before today
+        d = reference_date - timedelta(days=1)
         while not self._is_business_day_et(d):
+            d = d - timedelta(days=1)
+        return d
+
+    def _prior_business_day_cet(self) -> datetime.date:
+        today_cet = datetime.now(self._tz_cet).date()
+        d = today_cet - timedelta(days=1)
+        while d.weekday() >= 5:
             d = d - timedelta(days=1)
         return d
 
