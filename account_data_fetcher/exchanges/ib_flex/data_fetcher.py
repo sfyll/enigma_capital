@@ -20,10 +20,11 @@ from infrastructure.api_secret_getter import ApiMetaData
 
 class DataFetcher(ExchangeBase):
     _EXCHANGE = "IB"
+    _REPORT_REQUEST_SPACING_SECONDS = 2
+    _INITIAL_POLL_DELAY_SECONDS = 5
+    _RETRYABLE_SEND_ERROR_CODES = {1001, 1009, 1018}
 
     FLEX_BASE_URLS = [
-        "https://www.interactivebrokers.com",
-        "https://www1.interactivebrokers.com",
         "https://ndcdyn.interactivebrokers.com",
         "https://gdcdyn.interactivebrokers.com",
     ]
@@ -78,9 +79,9 @@ class DataFetcher(ExchangeBase):
         }
 
     async def process_request(self) -> dict:
-        balance_report_task = self._fetch_report_async(self.account_and_query_ids["query_id_balance"])
-        position_report_task = self._fetch_report_async(self.account_and_query_ids["query_id_position"])
-        balance_response, position_response = await asyncio.gather(balance_report_task, position_report_task)
+        balance_response = await self._fetch_report_async(self.account_and_query_ids["query_id_balance"])
+        await asyncio.sleep(self._REPORT_REQUEST_SPACING_SECONDS)
+        position_response = await self._fetch_report_async(self.account_and_query_ids["query_id_position"])
 
         balance_statement = balance_response.FlexStatements[0]
         position_statement = position_response.FlexStatements[0]
@@ -199,12 +200,13 @@ class DataFetcher(ExchangeBase):
                     )
                     continue
 
-                send_url = base_url + "/Universal/servlet/FlexStatementService.SendRequest"
-                stmt_url_fallback = base_url + "/Universal/servlet/FlexStatementService.GetStatement"
+                send_url = base_url + "/AccountManagement/FlexWebService/SendRequest"
+                stmt_url_fallback = base_url + "/AccountManagement/FlexWebService/GetStatement"
 
                 try:
                     # Ask IBKR to generate the statement
                     stmt_access = request_statement(token, query_id, url=send_url)
+                    sleep(self._INITIAL_POLL_DELAY_SECONDS)
 
                     # Poll candidates: use IB-provided URL only if it resolves; always include our fallback
                     poll_candidates = []
@@ -276,8 +278,8 @@ class DataFetcher(ExchangeBase):
                         continue
 
                 except ResponseCodeError as e:
-                    if int(e.code) == 1018:
-                        self.logger.debug("IBflex code 1018 received. Retrying after backoff delay.")
+                    if int(e.code) in self._RETRYABLE_SEND_ERROR_CODES:
+                        self.logger.warning(f"IBflex code {e.code} received. Retrying after backoff delay.")
                         sleep(5 * attempt)
                         continue
                     else:
